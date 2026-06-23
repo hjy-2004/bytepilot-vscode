@@ -195,15 +195,14 @@ export class ChatPanel {
       vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist', 'index.html')
     );
 
-    const csp = this.panel.webview.cspSource;
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp} 'unsafe-inline'; script-src ${csp}; font-src ${csp}; connect-src ${csp};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource}; font-src ${this.panel.webview.cspSource};">
   ${styleUri ? `<link rel="stylesheet" href="${styleUri}">` : ''}
-  <title>BytePilot</title>
+  <title>AI Chat</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -211,14 +210,24 @@ export class ChatPanel {
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
       background: var(--vscode-sideBar-background);
-      height: 100vh; overflow: hidden; padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      padding: 0;
     }
     #root { height: 100%; }
+    .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--vscode-descriptionForeground);
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="${scriptUri}"></script>
+  <div id="root"><div class="placeholder">AI Coding Agent loading...</div></div>
+  <script src="${scriptUri}"></script>
 </body>
 </html>`;
   }

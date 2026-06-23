@@ -541,15 +541,14 @@ function getSidebarHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
     }
   }
 
-  const csp = webview.cspSource;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp} 'unsafe-inline'; script-src ${csp}; font-src ${csp}; connect-src ${csp};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource}; font-src ${webview.cspSource};">
   ${styleUri ? `<link rel="stylesheet" href="${styleUri}">` : ''}
-  <title>BytePilot</title>
+  <title>AI Chat</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -564,7 +563,7 @@ function getSidebarHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="${scriptUri}"></script>
+  <script src="${scriptUri}"></script>
 </body>
 </html>`;
 }
