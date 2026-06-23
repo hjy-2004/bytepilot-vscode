@@ -1,6 +1,6 @@
 # BytePilot - VS Code AI 编程助手
 
-[English](./README_EN.md)
+[English](https://github.com/hjy-2004/bytepilot-vscode/blob/master/README_EN.md)
 
 Cursor-like AI coding assistant，完全运行在 VS Code 中。支持多 AI 提供商、内联代码补全、文件编辑、终端命令、多会话管理。
 
