@@ -71,5 +71,6 @@ export function getConfigState(): {
     availableModels: getAvailableModels(provider),
     initialized,
     displayProvider,
+    baseURL,
   };
 }

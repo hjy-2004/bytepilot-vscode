@@ -23,6 +23,7 @@ interface ChatContainerProps {
   onCancel: () => void;
   onSetup: () => void;
   onChangeModel: (model: string) => void;
+  onChangeSettings: (settings: { provider?: string; chatModel?: string; baseURL?: string; apiKey?: string }) => void;
   sessions: SessionInfo[];
   activeSessionId: string | null;
   onNewSession: () => void;
@@ -40,6 +41,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   onCancel,
   onSetup,
   onChangeModel,
+  onChangeSettings,
   sessions,
   activeSessionId,
   onNewSession,
@@ -66,7 +68,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           onNew={onNewSession}
           onDelete={onDeleteSession}
         />
-        <ModelSelector config={config} onSetup={onSetup} onChangeModel={onChangeModel} />
+        <ModelSelector config={config} onSetup={onSetup} onChangeModel={onChangeModel} onChangeSettings={onChangeSettings} />
       </div>
 
       {/* Context bar */}

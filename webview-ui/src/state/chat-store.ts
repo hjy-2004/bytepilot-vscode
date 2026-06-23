@@ -22,6 +22,7 @@ export interface ConfigState {
   provider: string;
   chatModel: string;
   completionModel: string;
+  baseURL?: string;
   temperature: number;
   maxTokens: number;
   completionsEnabled: boolean;

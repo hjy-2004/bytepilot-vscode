@@ -148,6 +148,7 @@ export interface ConfigStateMessage {
     availableModels: { id: string; name: string }[];
     initialized: boolean;
     displayProvider: string;
+    baseURL?: string;
   };
 }
 
