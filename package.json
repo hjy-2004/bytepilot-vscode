@@ -1,0 +1,215 @@
+{
+  "name": "ai-coding-agent",
+  "displayName": "AI Coding Agent",
+  "description": "Cursor-like AI coding assistant for VS Code",
+  "version": "0.1.0",
+  "publisher": "ai-coding-agent",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiCodingAgent.openChat",
+        "title": "Open AI Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "aiCodingAgent.newChat",
+        "title": "New AI Chat Session"
+      },
+      {
+        "command": "aiCodingAgent.configureProvider",
+        "title": "Configure AI Provider"
+      },
+      {
+        "command": "aiCodingAgent.testProvider",
+        "title": "Test AI Provider Connection"
+      },
+      {
+        "command": "aiCodingAgent.explainCode",
+        "title": "AI: Explain Selected Code"
+      },
+      {
+        "command": "aiCodingAgent.fixCode",
+        "title": "AI: Fix Selected Code"
+      },
+      {
+        "command": "aiCodingAgent.generateCode",
+        "title": "AI: Generate Code"
+      },
+      {
+        "command": "aiCodingAgent.importConfig",
+        "title": "AI: Import Config from Claude/Cursor/Other",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "aiCodingAgent.resetConfig",
+        "title": "AI: Reset Configuration",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "aiCodingAgent.showConfig",
+        "title": "AI: Show Current Configuration"
+      },
+      {
+        "command": "aiCodingAgent.debugSessions",
+        "title": "AI: Debug Sessions"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiCodingAgent",
+          "title": "AI Coding Agent",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "aiCodingAgent": [
+        {
+          "type": "webview",
+          "id": "aiCodingAgent.chatPanel",
+          "name": "Chat",
+          "icon": "$(comment-discussion)",
+          "retainContextWhenHidden": true
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Coding Agent",
+      "properties": {
+        "aiCodingAgent.provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic",
+            "ollama"
+          ],
+          "default": "anthropic",
+          "description": "AI provider to use for chat and completions."
+        },
+        "aiCodingAgent.chatModel": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "description": "Model ID for chat conversations."
+        },
+        "aiCodingAgent.completionModel": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID for inline code completions. Uses chatModel if empty."
+        },
+        "aiCodingAgent.baseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL override for API requests (e.g., http://localhost:11434/v1 for Ollama, custom proxies)."
+        },
+        "aiCodingAgent.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Temperature for chat generation (0-2). Higher = more creative."
+        },
+        "aiCodingAgent.maxTokens": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 256,
+          "maximum": 32000,
+          "description": "Maximum tokens per response."
+        },
+        "aiCodingAgent.completionsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline code completions."
+        },
+        "aiCodingAgent.completionDebounceMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 100,
+          "maximum": 2000,
+          "description": "Delay in ms before requesting a completion after typing stops."
+        },
+        "aiCodingAgent.completionTemperature": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Temperature for inline completions. Lower = more deterministic."
+        },
+        "aiCodingAgent.completionMaxTokens": {
+          "type": "number",
+          "default": 256,
+          "minimum": 16,
+          "maximum": 4096,
+          "description": "Maximum tokens for inline completion responses."
+        },
+        "aiCodingAgent.contextLength": {
+          "type": "number",
+          "default": 128000,
+          "minimum": 4096,
+          "maximum": 256000,
+          "description": "Maximum context length (tokens) to include in prompts."
+        },
+        "aiCodingAgent.contextProviders": {
+          "type": "object",
+          "default": {
+            "code": true,
+            "problems": true,
+            "folder": true
+          },
+          "properties": {
+            "code": { "type": "boolean", "description": "Include open file context" },
+            "problems": { "type": "boolean", "description": "Include diagnostics/errors" },
+            "folder": { "type": "boolean", "description": "Include project structure" }
+          },
+          "description": "Context providers to include in prompts."
+        },
+        "aiCodingAgent.toolApprovalLevel": {
+          "type": "string",
+          "enum": [
+            "always",
+            "writeOnly",
+            "never"
+          ],
+          "default": "writeOnly",
+          "description": "When to require user approval for tool calls. 'always' = every tool, 'writeOnly' = only write/execute tools, 'never' = never ask (dangerous)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "build:webview": "cd webview-ui && npm run build",
+    "dev:webview": "cd webview-ui && npm run dev",
+    "lint": "eslint src --ext .ts",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run build && npm run build:webview"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.0",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0",
+    "@vscode/vsce": "^3.0.0"
+  },
+  "dependencies": {
+    "ai": "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/anthropic": "^1.0.0",
+    "zod": "^3.23.0",
+    "ignore": "^7.0.0",
+    "diff": "^7.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+out/
+*.vsix
+.DS_Store
+webview-ui/node_modules/
+webview-ui/dist/
+.vscode-test/
+
+# Sensitive — contains API keys
+.claude/
+.env
+*.env

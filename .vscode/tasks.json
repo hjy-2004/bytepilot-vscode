@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": [],
+      "label": "npm: build",
+      "detail": "Build the extension with esbuild"
+    },
+    {
+      "type": "npm",
+      "script": "build:webview",
+      "path": "webview-ui",
+      "problemMatcher": [],
+      "label": "npm: build webview",
+      "detail": "Build the webview UI with Vite"
+    }
+  ]
+}
