@@ -24,6 +24,12 @@ Cursor-like AI coding assistant，完全运行在 VS Code 中。支持多 AI 提
 
 ## 安装
 
+### 直接安装（推荐）
+
+从 [Releases](https://github.com/hjy-2004/bytepilot-vscode/releases) 下载最新的 `.vsix` 文件，然后在 VS Code 中：
+
+`Ctrl+Shift+P` → **Extensions: Install from VSIX** → 选择下载的文件
+
 ### 从源码
 
 ```bash

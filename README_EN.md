@@ -24,6 +24,12 @@ Cursor-like AI coding assistant running entirely in VS Code. Multi-provider supp
 
 ## Install
 
+### Direct Install (Recommended)
+
+Download the latest `.vsix` from [Releases](https://github.com/hjy-2004/bytepilot-vscode/releases), then in VS Code:
+
+`Ctrl+Shift+P` → **Extensions: Install from VSIX** → select the file
+
 ### From Source
 
 ```bash
