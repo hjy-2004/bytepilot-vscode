@@ -38,14 +38,26 @@ export const MessageList: React.FC<MessageListProps> = ({
         />
       )}
 
-      {/* Loading indicator when waiting for first token */}
+      {/* Thinking indicator when waiting for first token */}
       {isStreaming && !streamingText && (
-        <div style={{ padding: '4px 0', display: 'flex', gap: '4px' }}>
-          <span className="dot-pulse" style={{
-            width: '6px', height: '6px', borderRadius: '50%',
-            background: 'var(--vscode-descriptionForeground)',
-            animation: 'pulse 1.4s infinite ease-in-out',
-          }} />
+        <div style={{
+          padding: '12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+            <span className="thinking-dot" style={{ animationDelay: '0s' }} />
+            <span className="thinking-dot" style={{ animationDelay: '0.2s' }} />
+            <span className="thinking-dot" style={{ animationDelay: '0.4s' }} />
+          </div>
+          <span style={{
+            fontSize: '12px',
+            color: 'var(--vscode-descriptionForeground)',
+            opacity: 0.8,
+          }}>
+            Thinking...
+          </span>
         </div>
       )}
 

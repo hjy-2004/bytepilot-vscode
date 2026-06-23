@@ -37,7 +37,9 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
           userSelect: 'none',
         }}
       >
-        <span>{statusIcon}</span>
+        <span style={toolCall.status === 'running' ? { animation: 'spin 1.2s linear infinite', display: 'inline-block' } : undefined}>
+          {statusIcon}
+        </span>
         <span style={{ fontWeight: 600 }}>{toolCall.displayName}</span>
         <span style={{ opacity: 0.6, fontSize: '11px', flex: 1 }}>
           {toolCall.status === 'running' ? 'Running...' : ''}

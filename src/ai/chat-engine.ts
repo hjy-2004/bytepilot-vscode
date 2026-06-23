@@ -1,4 +1,4 @@
-import { generateText, type CoreMessage } from 'ai';
+import { streamText, type CoreMessage } from 'ai';
 import type { LanguageModelV1 } from 'ai';
 import { ToolRegistry } from '../tools/registry';
 import { StreamBridge } from './stream-bridge';
@@ -26,8 +26,8 @@ __TOOLS_PLACEHOLDER__
 /**
  * Core chat engine that manages AI conversations with tool calling.
  *
- * Uses a manual tool loop (maxSteps: 1) so we can pause for user approval
- * on write/execute tools before executing them.
+ * Uses streamText() for per-token streaming output, with multi-step
+ * tool calling (maxSteps: 15) handled automatically by the AI SDK.
  */
 export class ChatEngine {
   private history: CoreMessage[] = [];
@@ -128,51 +128,46 @@ export class ChatEngine {
     ];
 
     try {
-      // Use SDK's built-in multi-step tool calling — handles all message formatting correctly
-      const result = await generateText({
+      // Use streamText for per-token streaming output with multi-step tool calling
+      const result = streamText({
         model: this.chatModel,
         messages: allMessages,
         tools: this.toolRegistry.getAISDKTools(),
-        maxSteps: 15, // SDK handles tool execution loop automatically
+        maxSteps: 15,
         temperature: 0.3,
         maxTokens: 4096,
         abortSignal: this.abortController!.signal,
-        onStepFinish: ({ text, toolCalls, toolResults }) => {
-          if (text) {
-            this.lastStreamText += text;
-            this.streamBridge.sendToken(text);
-          }
-          if (toolCalls) {
-            for (const tc of toolCalls) {
-              const dn = this.toolRegistry.getDisplayName(tc.toolName) || tc.toolName;
-              this.lastToolCalls.push({ id: tc.toolCallId, name: tc.toolName, displayName: dn, args: tc.args });
-              this.streamBridge.sendToolCall(tc.toolCallId, tc.toolName, dn, tc.args);
-            }
-          }
-          if (toolResults) {
-            for (const tr of toolResults) {
-              this.lastToolResults.push({ id: tr.toolCallId, name: tr.toolName, result: String(tr.result), success: !tr.error });
-              this.streamBridge.sendToolResult(tr.toolCallId, tr.toolName, String(tr.result), !tr.error);
-            }
-          }
-        },
       });
 
-      const fullText = result.text || '';
-
-      // Append new messages to history
-      for (const msg of result.response.messages) {
-        if (msg.role !== 'system') {
-          this.history.push(msg);
+      // Consume the full stream: per-token text deltas + tool events
+      type Chunk = { type: string; textDelta?: string; toolCallId?: string; toolName?: string; args?: unknown; result?: unknown; error?: unknown };
+      for await (const raw of result.fullStream) {
+        const c = raw as unknown as Chunk;
+        if (c.type === 'text-delta' && c.textDelta !== undefined) {
+          this.lastStreamText += c.textDelta;
+          this.streamBridge.sendToken(c.textDelta);
+        } else if (c.type === 'tool-call' && c.toolCallId && c.toolName) {
+          const dn = this.toolRegistry.getDisplayName(c.toolName) || c.toolName;
+          this.lastToolCalls.push({ id: c.toolCallId, name: c.toolName, displayName: dn, args: (c.args || {}) as Record<string, unknown> });
+          this.streamBridge.sendToolCall(c.toolCallId, c.toolName, dn, (c.args || {}) as Record<string, unknown>);
+        } else if (c.type === 'tool-result' && c.toolCallId && c.toolName) {
+          this.lastToolResults.push({ id: c.toolCallId, name: c.toolName, result: String(c.result ?? ''), success: !c.error });
+          this.streamBridge.sendToolResult(c.toolCallId, c.toolName, String(c.result ?? ''), !c.error);
+        } else if (c.type === 'error') {
+          throw c.error;
         }
+      }
+
+      // After stream completes, get response messages for history
+      const response = await result.response;
+      for (const msg of response.messages) {
+        this.history.push(msg);
       }
       // Save full history (including tool calls) for session resume
       if (this.workspacePath && this.getSessionId) {
         saveFullHistory(this.workspacePath, this.getSessionId(), this.history);
       }
 
-      // Send final text as chunks for visual effect
-      // Text already sent via onStepFinish — just mark done
       this.isGenerating = false;
       this.streamBridge.sendDone();
       return;
@@ -183,16 +178,22 @@ export class ChatEngine {
         logInfo('Tool call failed (400), retrying without tools');
         this.streamBridge.sendToken('(Tools unavailable, using basic chat)\n');
         try {
-          const result = await generateText({
+          const result2 = streamText({
             model: this.chatModel,
             messages: allMessages.filter(m => m.role !== 'system'),
             temperature: 0.3,
             maxTokens: 4096,
             abortSignal: this.abortController!.signal,
           });
-          const text = result.text || '';
-          this.history.push({ role: 'assistant', content: text } as CoreMessage);
-          this.streamBridge.sendToken(text);
+          let fullText = '';
+          for await (const raw of result2.fullStream) {
+            const c = raw as unknown as { type: string; textDelta?: string };
+            if (c.type === 'text-delta' && c.textDelta !== undefined) {
+              fullText += c.textDelta;
+              this.streamBridge.sendToken(c.textDelta);
+            }
+          }
+          this.history.push({ role: 'assistant', content: fullText } as CoreMessage);
           this.isGenerating = false;
           this.streamBridge.sendDone();
           if (this.workspacePath && this.getSessionId) {
