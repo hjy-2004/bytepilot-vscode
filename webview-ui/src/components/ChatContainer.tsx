@@ -66,7 +66,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           onNew={onNewSession}
           onDelete={onDeleteSession}
         />
-        <ModelSelector config={config} onSetup={onSetup} onOpenSettings={() => {}} onChangeModel={onChangeModel} />
+        <ModelSelector config={config} onSetup={onSetup} onChangeModel={onChangeModel} />
       </div>
 
       {/* Context bar */}
