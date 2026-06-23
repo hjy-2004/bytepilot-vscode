@@ -1,4 +1,4 @@
-# AI Coding Agent - VS Code 扩展
+# BytePilot - VS Code 扩展
 
 [English](./README_EN.md)
 

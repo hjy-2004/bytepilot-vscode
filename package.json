@@ -1,6 +1,6 @@
 {
-  "name": "ai-coding-agent",
-  "displayName": "AI Coding Agent",
+  "name": "bytepilot",
+  "displayName": "BytePilot",
   "description": "Cursor-like AI coding assistant for VS Code",
   "version": "0.1.0",
   "publisher": "ai-coding-agent",
