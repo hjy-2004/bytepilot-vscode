@@ -98,23 +98,21 @@ export class MessageRouter implements vscode.Disposable {
     switch (message.type) {
       // ---- Chat (requires ChatPanel) ----
       case 'chat.send': {
-        // Lazy-init engine if needed
         if (!this.chatEngine && this.createEngineFn) {
           this.chatEngine = this.createEngineFn() || null;
-          if (this.chatEngine) {
-            this.chatEngine.onStreamEvent((msg) => {
-              if (this.streamResponder) {
-                this.streamResponder(msg);
-              } else {
-                ChatPanel.current()?.postMessage(msg);
-              }
-            });
-          }
         }
         if (!this.chatEngine) {
           reply({ type: 'chat.error', payload: { message: 'AI engine not ready. Check your provider configuration.' } });
           return;
         }
+        // Always rewire stream to the active webview (sidebar or panel)
+        this.chatEngine.onStreamEvent((msg) => {
+          if (this.streamResponder) {
+            this.streamResponder(msg);
+          } else {
+            ChatPanel.current()?.postMessage(msg);
+          }
+        });
         try {
           await this.chatEngine.sendMessage(
             message.payload.content,

@@ -155,37 +155,43 @@ export class ChatPanel {
   }
 
   private getHtml(): string {
-    // In production, load the bundled webview JS from webview-ui/dist
     const webviewDistPath = path.join(this.extensionUri.fsPath, 'webview-ui', 'dist');
+    logInfo(`ChatPanel getHtml: distPath=${webviewDistPath}, exists=${fs.existsSync(webviewDistPath)}`);
 
     let scriptUri: vscode.Uri;
     let styleUri: vscode.Uri | undefined;
 
-    // Check for Vite-built files first
     const assetsDir = path.join(webviewDistPath, 'assets');
-    if (fs.existsSync(assetsDir)) {
+    const assetsExist = fs.existsSync(assetsDir);
+    logInfo(`ChatPanel assets: ${assetsDir}, exists=${assetsExist}`);
+    if (assetsExist) {
       const files = fs.readdirSync(assetsDir);
+      logInfo(`ChatPanel assets files: ${files.join(', ')}`);
       const jsFile = files.find(f => f.endsWith('.js'));
       const cssFile = files.find(f => f.endsWith('.css'));
       if (jsFile) {
         scriptUri = vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist', 'assets', jsFile);
+        logInfo(`ChatPanel scriptUri from assets: ${scriptUri.toString()}`);
       }
       if (cssFile) {
         styleUri = vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist', 'assets', cssFile);
+        logInfo(`ChatPanel styleUri from assets: ${styleUri.toString()}`);
       }
     }
 
-    // Fallback: use dev index.html approach
     const indexPath = path.join(webviewDistPath, 'index.html');
+    logInfo(`ChatPanel index.html: ${indexPath}, exists=${fs.existsSync(indexPath)}`);
     if (fs.existsSync(indexPath)) {
       const html = fs.readFileSync(indexPath, 'utf-8');
-      // Replace relative paths with webview URIs
-      const webviewUri = this.panel.webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist')
-      );
+      // Replace absolute asset paths with webview URIs
       return html.replace(
-        /(src|href)="\.?\/(assets\/[^"]+)"/g,
-        (_, attr, filePath) => `${attr}="${webviewUri}${filePath}"`
+        /(src|href)="\/assets\/([^"]+)"/g,
+        (_, attr, file) => {
+          const uri = this.panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist', 'assets', file)
+          );
+          return `${attr}="${uri}"`;
+        }
       );
     }
 

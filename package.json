@@ -69,7 +69,7 @@
       "activitybar": [
         {
           "id": "aiCodingAgent",
-          "title": "AI Coding Agent",
+          "title": "BytePilot",
           "icon": "$(hubot)"
         }
       ]
@@ -82,6 +82,15 @@
           "name": "Chat",
           "icon": "$(comment-discussion)",
           "retainContextWhenHidden": true
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "aiCodingAgent.openChat",
+          "when": "view == aiCodingAgent.chatPanel",
+          "group": "navigation"
         }
       ]
     },

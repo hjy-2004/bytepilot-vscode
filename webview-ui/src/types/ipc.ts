@@ -146,6 +146,8 @@ export interface ConfigStateMessage {
     maxTokens: number;
     completionsEnabled: boolean;
     availableModels: { id: string; name: string }[];
+    initialized: boolean;
+    displayProvider: string;
   };
 }
 

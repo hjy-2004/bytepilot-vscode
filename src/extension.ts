@@ -489,83 +489,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {
-    const isNew = webviewView.webview !== this.lastWebview;
-    this.lastWebview = webviewView.webview;
-
-    webviewView.webview.options = {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, 'dist'),
-        vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist'),
-      ],
-    };
-
-    if (isNew) {
-      // New webview: set HTML and register listeners
-      webviewView.webview.html = getSidebarHtml(webviewView.webview, this.extensionUri);
-
-      webviewView.webview.onDidReceiveMessage((msg: WebViewMessage) => {
-        toolRegistry.setExecutionContext({
-          workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd(),
-          signal: new AbortController().signal,
-        });
-        messageRouter.handle(msg, (response) => {
-          webviewView.webview.postMessage(response);
-        });
-      });
-    }
+    // Open the ChatPanel instead of showing a sidebar webview
+    const panel = ChatPanel.createOrShow(this.extensionUri, handleWebViewMessage);
+    panel.sendConfigState(getConfigState());
   }
-}
-
-function getSidebarHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-  const webviewDistPath = path.join(extensionUri.fsPath, 'webview-ui', 'dist');
-  const assetsDir = path.join(webviewDistPath, 'assets');
-
-  let scriptUri = '';
-  let styleUri = '';
-
-  if (fs.existsSync(assetsDir)) {
-    const files = fs.readdirSync(assetsDir);
-    const jsFile = files.find(f => f.endsWith('.js'));
-    const cssFile = files.find(f => f.endsWith('.css'));
-    if (jsFile) {
-      scriptUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'webview-ui', 'dist', 'assets', jsFile)
-      ).toString();
-    }
-    if (cssFile) {
-      styleUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'webview-ui', 'dist', 'assets', cssFile)
-      ).toString();
-    }
-  }
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource}; font-src ${webview.cspSource};">
-  ${styleUri ? `<link rel="stylesheet" href="${styleUri}">` : ''}
-  <title>AI Chat</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: var(--vscode-font-family);
-      font-size: var(--vscode-font-size);
-      color: var(--vscode-foreground);
-      background: var(--vscode-sideBar-background);
-      height: 100vh; overflow: hidden; padding: 0;
-    }
-    #root { height: 100%; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script src="${scriptUri}"></script>
-</body>
-</html>`;
 }
 
 export function deactivate(): void {
