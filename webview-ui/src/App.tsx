@@ -125,6 +125,10 @@ const App: React.FC = () => {
     postMessage({ type: 'config.manualSetup' } as any);
   }, [postMessage]);
 
+  const handleChangeModel = useCallback((model: string) => {
+    postMessage({ type: 'config.set', payload: { chatModel: model } } as any);
+  }, [postMessage]);
+
   const isConfigured = !!(store.config?.initialized);
 
   // Auto-scan only after config.loaded confirms no config exists
@@ -194,6 +198,7 @@ const App: React.FC = () => {
             setIsScanning(false);
             setScanDone(false);
           }}
+          onChangeModel={handleChangeModel}
           sessions={sessions}
           activeSessionId={activeSessionId}
           onNewSession={handleNewSession}

@@ -201,6 +201,17 @@ export class MessageRouter implements vscode.Disposable {
         break;
       }
 
+      case 'config.set': {
+        const { provider, chatModel, completionModel, baseURL, apiKey } = (message as any).payload || {};
+        const cfg = vscode.workspace.getConfiguration('aiCodingAgent');
+        if (provider) await cfg.update('provider', provider, vscode.ConfigurationTarget.Global);
+        if (chatModel) await cfg.update('chatModel', chatModel, vscode.ConfigurationTarget.Global);
+        if (completionModel !== undefined) await cfg.update('completionModel', completionModel, vscode.ConfigurationTarget.Global);
+        if (baseURL !== undefined) await cfg.update('baseURL', baseURL, vscode.ConfigurationTarget.Global);
+        setTimeout(() => reply({ type: 'config.state', payload: getConfigState() }), 500);
+        break;
+      }
+
       case 'config.scan': {
         const found = await scanKnownLocations();
         reply({
