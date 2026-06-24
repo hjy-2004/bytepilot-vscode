@@ -74,6 +74,11 @@ export interface ConfigManualSetupMessage {
   type: 'config.manualSetup';
 }
 
+export interface FilesSearchMessage {
+  type: 'files.search';
+  payload: { query: string };
+}
+
 export type WebViewMessage =
   | ChatSendMessage
   | ChatCancelMessage
@@ -221,6 +226,11 @@ export interface ConfigFoundMessage {
 
 export interface ChatClearMessage {
   type: 'chat.clear';
+}
+
+export interface FilesSearchResultMessage {
+  type: 'files.searchResult';
+  payload: { files: Array<{ path: string; name: string }> };
 }
 
 export type ExtensionMessage =

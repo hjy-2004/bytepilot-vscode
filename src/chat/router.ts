@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { ChatPanel } from './panel';
 import { ChatEngine } from '../ai/chat-engine';
 import { ToolRegistry } from '../tools/registry';
@@ -118,9 +119,28 @@ export class MessageRouter implements vscode.Disposable {
             ChatPanel.current()?.postMessage(msg);
           }
         });
+        // Parse @file references and read file contents as context
+        let content = message.payload.content;
+        const ws = this.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+        const atRefs = content.match(/@(\S+)/g);
+        if (atRefs) {
+          for (const ref of atRefs) {
+            const fp = ref.substring(1);
+            try {
+              const fullPath = path.resolve(ws, fp);
+              if (fullPath.startsWith(ws + path.sep) || fullPath === ws) {
+                const uri = vscode.Uri.file(fullPath);
+                const fileContent = (await vscode.workspace.fs.readFile(uri)).toString();
+                content = `<context file="${fp}">\n${fileContent}\n</context>\n\n${content}`;
+                logInfo(`@file attached: ${fp} (${fileContent.length} chars)`);
+              }
+            } catch { /* skip */ }
+          }
+        }
+
         try {
           await this.chatEngine.sendMessage(
-            message.payload.content,
+            content,
             async (toolCallId, toolName, displayName, args) => {
               logInfo(`[Approval] Requesting for ${toolName} (${toolCallId})`);
               // Compute preview diff for file-editing tools
@@ -332,6 +352,30 @@ export class MessageRouter implements vscode.Disposable {
             }
           }
           reply({ type: 'session.list', payload: { sessions: listSessions(ws) } });
+        }
+        break;
+      }
+
+      case 'files.search': {
+        const ws = this.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+        const query = (message.payload.query || '').toLowerCase();
+        logInfo(`[files.search] ws=${ws} query="${query}"`);
+        try {
+          const pattern = query ? `**/*${query}*` : '**/*';
+          const uris = await vscode.workspace.findFiles(
+            new vscode.RelativePattern(ws, pattern),
+            '{**/node_modules/**,**/.git/**,**/dist/**,**/out/**,**/.claude/**,**/package-lock.json}',
+            30,
+          );
+          const files = uris.map(uri => {
+            const rel = path.relative(ws, uri.fsPath).replace(/\\/g, '/');
+            return { path: rel, name: path.basename(rel) };
+          });
+          logInfo(`[files.search] found ${files.length} files for "${query}"`);
+          reply({ type: 'files.searchResult', payload: { files } });
+        } catch (e) {
+          logInfo(`[files.search] error: ${e}`);
+          reply({ type: 'files.searchResult', payload: { files: [] } });
         }
         break;
       }
