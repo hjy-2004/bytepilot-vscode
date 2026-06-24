@@ -36,7 +36,7 @@ const App: React.FC = () => {
         store.appendStreamChunk(msg.payload.text);
         break;
       case 'chat.toolCall':
-        store.addToolCall(msg.payload.id, msg.payload.name, msg.payload.displayName, msg.payload.args);
+        store.addToolCall(msg.payload.id, msg.payload.name, msg.payload.displayName, msg.payload.args, msg.payload.needsApproval);
         break;
       case 'chat.toolResult':
         store.updateToolResult(msg.payload.id, msg.payload.result, msg.payload.success, msg.payload.diff);

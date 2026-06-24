@@ -94,7 +94,8 @@ export class ChatEngine {
     const sysCtx = this.getSystemContext ? await this.getSystemContext() : '';
     const toolDescs = this.toolRegistry.getSystemPromptTools();
     const base = SYSTEM_PROMPT.replace('__TOOLS_PLACEHOLDER__', toolDescs);
-    const systemPrompt = sysCtx ? `${base}\n\n## Current Workspace Context\n${sysCtx}` : base;
+    const sysInfo = `\n\n## System Info\n- OS: ${process.platform} (${process.platform === 'win32' ? 'use cmd /c, del, rmdir; not rm, rm -rf, mkdir' : 'use standard Unix commands'})`;
+    const systemPrompt = sysCtx ? `${base}${sysInfo}\n\n## Current Workspace Context\n${sysCtx}` : `${base}${sysInfo}`;
 
     const tools = this.toolRegistry.list();
     const toolDefs: ToolDef[] = tools.map((t) => {
@@ -120,9 +121,9 @@ export class ChatEngine {
 
     const cb: AgentCallbacks = {
       onToken: (text) => { this.lastStreamText += text; this.streamBridge.sendToken(text); },
-      onToolCall: (id, name, dn, args) => {
+      onToolCall: (id, name, dn, args, needsApproval) => {
         this.lastToolCalls.push({ id, name, displayName: dn, args });
-        this.streamBridge.sendToolCall(id, name, dn, args);
+        this.streamBridge.sendToolCall(id, name, dn, args, needsApproval);
       },
       onApprovalNeeded: onApproval || (async () => true),
       onToolResult: (id, name, result, success) => {

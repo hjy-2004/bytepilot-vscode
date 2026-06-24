@@ -57,7 +57,7 @@ interface ChatStore {
   addUserMessage: (content: string) => void;
   appendStreamChunk: (text: string) => void;
   finalizeMessage: (usage?: { inputTokens: number; outputTokens: number }) => void;
-  addToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>) => void;
+  addToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>, needsApproval?: boolean) => void;
   setToolPendingApproval: (id: string, diff?: UnifiedDiff) => void;
   setToolRunning: (id: string) => void;
   updateToolResult: (id: string, result: string, success: boolean, diff?: UnifiedDiff) => void;
@@ -114,29 +114,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  addToolCall: (id, name, displayName, args) => {
+  addToolCall: (id, name, displayName, args, needsApproval) => {
     const { streamingText, messages } = get();
-    // If there's streamed text, finalize it first
     let updatedMsgs = messages;
     if (streamingText.trim()) {
-      updatedMsgs = [...messages, {
-        id: genId(),
-        role: 'assistant',
-        content: streamingText,
-        timestamp: Date.now(),
-        toolCalls: [],
-      }];
+      updatedMsgs = [...messages, { id: genId(), role: 'assistant', content: streamingText, timestamp: Date.now(), toolCalls: [] }];
     }
-    // Add the tool call to the last assistant message
-    const lastMsg = updatedMsgs[updatedMsgs.length - 1];
-    if (lastMsg && lastMsg.role === 'assistant') {
-      const toolCall: ToolCallEntry = { id, name, displayName, args, status: 'running' };
-      const updated = {
-        ...lastMsg,
-        toolCalls: [...(lastMsg.toolCalls || []), toolCall],
-      };
-      set({ messages: [...updatedMsgs.slice(0, -1), updated], streamingText: '', isStreaming: true });
+    // Create empty assistant message if last msg isn't assistant (e.g. tool call without text prefix)
+    let lastMsg = updatedMsgs[updatedMsgs.length - 1];
+    if (!lastMsg || lastMsg.role !== 'assistant') {
+      lastMsg = { id: genId(), role: 'assistant' as const, content: '', timestamp: Date.now(), toolCalls: [] };
+      updatedMsgs = [...updatedMsgs, lastMsg];
     }
+    const status = needsApproval ? ('pending_approval' as const) : ('running' as const);
+    const toolCall: ToolCallEntry = { id, name, displayName, args, status };
+    const updated = { ...lastMsg, toolCalls: [...(lastMsg.toolCalls || []), toolCall] };
+    set({ messages: [...updatedMsgs.slice(0, -1), updated], streamingText: '', isStreaming: true });
   },
 
   setToolPendingApproval: (id, diff) => {

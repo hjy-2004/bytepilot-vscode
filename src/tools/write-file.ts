@@ -26,7 +26,12 @@ export const writeFileTool: ToolDef = {
     try {
       const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
       const uri = vscode.Uri.file(fullPath);
-      const original = (await vscode.workspace.fs.readFile(uri)).toString();
+      let original = '';
+      try {
+        original = (await vscode.workspace.fs.readFile(uri)).toString();
+      } catch {
+        // File doesn't exist — diff shows all new content
+      }
       return computeDiffFromContent(args.filePath, original, args.content);
     } catch { return undefined; }
   },

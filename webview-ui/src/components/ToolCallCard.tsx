@@ -29,9 +29,16 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
       </div>
       {expanded && (
         <div style={{ padding: '6px 8px' }}>
-          {isPending && toolCall.diff ? (
+          {isPending ? (
             <>
-              <DiffView diff={toolCall.diff} />
+              {toolCall.diff ? <DiffView diff={toolCall.diff} /> : (
+                Object.keys(toolCall.args).length > 0 && (
+                  <div style={{ marginBottom: '4px' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>Arguments:</div>
+                    <pre style={{ background: 'var(--vscode-textCodeBlock-background)', padding: '4px 8px', borderRadius: '3px', fontSize: '11px', overflow: 'auto', maxHeight: '120px', margin: 0 }}>{JSON.stringify(toolCall.args, null, 2)}</pre>
+                  </div>
+                )
+              )}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
                 <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); useChatStore.getState().setToolRunning(toolCall.id); postMessage({ type: 'tool.reject', payload: { toolCallId: toolCall.id, reason: 'Rejected' } } as any); }} style={{ padding: '3px 12px', fontSize: '12px' }}>Reject</button>
                 <button className="btn-primary" onClick={(e) => { e.stopPropagation(); useChatStore.getState().setToolRunning(toolCall.id); postMessage({ type: 'tool.approve', payload: { toolCallId: toolCall.id } } as any); }} style={{ padding: '3px 12px', fontSize: '12px' }}>Approve</button>

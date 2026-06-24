@@ -24,12 +24,13 @@ export class StreamBridge {
     id: string,
     name: string,
     displayName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    needsApproval?: boolean,
   ): void {
     if (this.cancelled) return;
     this.callback?.({
       type: 'chat.toolCall',
-      payload: { id, name, displayName, args },
+      payload: { id, name, displayName, args, needsApproval },
     });
   }
 

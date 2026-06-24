@@ -109,6 +109,7 @@ export interface ChatToolCallMessage {
     name: string;
     displayName: string;
     args: Record<string, unknown>;
+    needsApproval?: boolean;
   };
 }
 

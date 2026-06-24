@@ -6,7 +6,7 @@ import { logAiRequestStart, logAiCompletion, logAiError, logToolCallStart, logTo
 
 export interface AgentCallbacks {
   onToken: (text: string) => void;
-  onToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>) => void;
+  onToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>, needsApproval?: boolean) => void;
   onApprovalNeeded: (id: string, name: string, displayName: string, args: Record<string, unknown>) => Promise<boolean>;
   onToolResult: (id: string, name: string, result: string, success: boolean) => void;
   getDisplayName: (name: string) => string;
@@ -76,11 +76,11 @@ export async function runAgentLoop(
       for (const tc of result.toolCalls) {
         if (signal?.aborted) break;
         const dn = cb.getDisplayName(tc.name) || tc.name;
-        cb.onToolCall(tc.id, tc.name, dn, tc.args);
+        cb.onToolCall(tc.id, tc.name, dn, tc.args, !cb.isReadOnly(tc.name));
 
         let approved = true;
         if (!cb.isReadOnly(tc.name)) {
-          cb.onToken(`\n\n⏳ **Waiting for approval**: ${dn} — check the permission dialog...\n\n`);
+          cb.onToken(`\n\n---\n⏳ **${dn}** needs your approval — scroll up to the tool card and click Approve or Reject.\n\n`);
           logInfo(`[AgentLoop] BLOCKING for approval of ${tc.name}...`);
           approved = await cb.onApprovalNeeded(tc.id, tc.name, dn, tc.args);
           logInfo(`[AgentLoop] UNBLOCKED: ${tc.name} approved=${approved}`);
