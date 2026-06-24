@@ -89,12 +89,13 @@ npx vsce package
 extension_plugin/
 ├── src/                    # Extension host
 │   ├── extension.ts        # Entry point
-│   ├── ai/                 # AI core (agent-loop, api-client, chat-engine, stream-bridge, ai-logger)
+│   ├── ai/                 # AI core (agent-loop, api-client, chat-engine, stream-bridge)
 │   ├── tools/              # 8 tools (incl. diff_file)
 │   ├── chat/               # Panel, router, JSONL persistence
 │   ├── context/            # Context collectors
 │   ├── completion/         # InlineCompletionItemProvider
-│   └── config/             # Settings, importer
+│   ├── config/             # Settings, importer
+│   └── utils/              # ai-logger, diff-helper
 ├── webview-ui/             # React UI (Vite + Zustand)
 └── esbuild.config.mjs      # Extension build
 ```
@@ -104,7 +105,7 @@ extension_plugin/
 | Layer | Technology |
 |-------|------------|
 | Extension | TypeScript + VS Code API |
-| AI Engine | Custom Anthropic Messages API client (SSE streaming) |
+| AI Engine | Custom Anthropic Messages API client (`/anthropic/v1/messages`, SSE streaming) |
 | Agent Loop | Manual control, AI-driven stop, 500-step safety cap |
 | Tool Approval | Inline diff + Approve/Reject, supports edit_file/write_file preview |
 | Completion | DeepSeek FIM Beta (`/beta/completions`) |
@@ -116,12 +117,12 @@ extension_plugin/
 
 ## Supported Providers
 
-| Provider | Chat | Completion | Tools |
-|----------|------|------------|-------|
-| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ |
-| Anthropic | ✅ | ⚠️ Extend | ✅ |
-| OpenAI | ✅ | ⚠️ Extend | ✅ |
-| Ollama | ✅ | ⚠️ Extend | ✅ |
+| Provider | Chat | Completion | Tools | Notes |
+|----------|------|------------|-------|-------|
+| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | Anthropic-compatible endpoint |
+| Anthropic | ✅ | ⚠️ Extend | ✅ | Native Anthropic API |
+| OpenAI | ⚠️ Needs adapter | ⚠️ Extend | ⚠️ Needs adapter | Extend api-client for OpenAI format |
+| Ollama | ⚠️ Needs adapter | ⚠️ Extend | ⚠️ Needs adapter | Same as above |
 
 ## License
 

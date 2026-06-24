@@ -89,12 +89,13 @@ npx vsce package
 extension_plugin/
 ├── src/                    # 扩展宿主 (TypeScript)
 │   ├── extension.ts        # 入口
-│   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, stream-bridge, ai-logger）
+│   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, stream-bridge）
 │   ├── tools/              # 8 个工具（含 diff_file）
 │   ├── chat/               # 聊天面板、路由、JSONL 历史持久化
 │   ├── context/            # 上下文收集器
 │   ├── completion/         # InlineCompletionItemProvider (DeepSeek FIM)
-│   └── config/             # 设置、校验、导入
+│   ├── config/             # 设置、校验、导入
+│   └── utils/              # ai-logger, diff-helper
 ├── webview-ui/             # React 聊天界面 (Vite + Zustand)
 └── esbuild.config.mjs      # 扩展构建
 ```
@@ -104,7 +105,7 @@ extension_plugin/
 | 层 | 技术 |
 |------|------|
 | 扩展宿主 | TypeScript + VS Code API |
-| AI 引擎 | 自建 Anthropic Messages API 客户端（SSE 流式） |
+| AI 引擎 | 自建 Anthropic Messages API 客户端（`/anthropic/v1/messages`，SSE 流式） |
 | Agent 循环 | 手动控制，AI 自主决定停止，500 步安全帽 |
 | 工具审批 | 内联 diff 视图 + Approve/Reject，支持 edit_file/write_file 预览 |
 | 内联补全 | DeepSeek FIM Beta (`/beta/completions`) |
@@ -116,12 +117,12 @@ extension_plugin/
 
 ## 支持的厂商
 
-| 厂商 | 对话 | 补全 | 工具 |
-|------|------|------|------|
-| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ |
-| Anthropic (Claude) | ✅ | ⚠️ 需扩展 | ✅ |
-| OpenAI (GPT) | ✅ | ⚠️ 需扩展 | ✅ |
-| Ollama | ✅ | ⚠️ 需扩展 | ✅ |
+| 厂商 | 对话 | 补全 | 工具 | 说明 |
+|------|------|------|------|------|
+| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | Anthropic 兼容端点 |
+| Anthropic (Claude) | ✅ | ⚠️ 需扩展 | ✅ | Anthropic 原生 API |
+| OpenAI (GPT) | ⚠️ 需适配 | ⚠️ 需扩展 | ⚠️ 需适配 | 需扩展 api-client 支持 OpenAI 格式 |
+| Ollama | ⚠️ 需适配 | ⚠️ 需扩展 | ⚠️ 需适配 | 同上 |
 
 ## License
 
