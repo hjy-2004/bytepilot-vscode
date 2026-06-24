@@ -2,18 +2,21 @@
 
 [中文](./README.md)
 
-Cursor-like AI coding assistant running entirely in VS Code. Multi-provider support, inline completion, file editing, terminal commands, and multi-session management.
+Cursor-like AI coding assistant running entirely in VS Code. Multi-provider support, inline completion, file editing with visual diff approval, terminal commands, and multi-session management.
 
 ## Features
 
-- **Chat** — AI conversation with streaming
+- **Chat** — AI conversation with streaming, AI decides when to stop
 - **Inline Completion** — Ghost-text suggestions on typing pause (Tab to accept)
+- **Visual Diff & Approval** — Inline diff preview with Approve/Reject before every file edit, no modal popups
 - **File Editing** — Precise `old_string → new_string` replacement (Claude Code style)
-- **Tool System** — 7 built-in tools: read / write / edit / search / list / command / diagnostics
+- **Tool System** — 8 built-in tools: read / write / edit / search / list / command / diagnostics / diff
 - **Auto Config** — Reads `.claude/settings.json` on first launch, zero setup
-- **Multi-Session** — JSONL persistence with create/switch/delete
+- **Multi-Session** — JSONL persistence with create/switch/delete, tool calls & diffs fully restored
 - **Multi-Provider** — Anthropic / OpenAI / DeepSeek / Ollama, auto-detected and routed
 - **Model Settings** — Click model badge to switch Provider / Model / Base URL / API Key
+- **Structured Logging** — BytePilot output channel logs AI requests, tool calls, API parameters
+- **@file References** — Type `@filename` to search workspace files, content auto-attached as context
 
 ## Quick Start
 
@@ -36,7 +39,7 @@ Download the latest `.vsix` from [Releases](https://github.com/hjy-2004/bytepilo
 git clone https://github.com/hjy-2004/bytepilot-vscode.git
 cd bytepilot-vscode
 npm install
-cd webview-ui && npm install && npm run build && cd ..
+cd webview-ui && npm install && cd ..
 npm run build
 ```
 
@@ -46,7 +49,6 @@ Open in VS Code, press **F5**.
 
 ```bash
 npx vsce package
-# Then Ctrl+Shift+P → Extensions: Install from VSIX
 ```
 
 ## Settings
@@ -59,6 +61,8 @@ npx vsce package
 | `aiCodingAgent.baseURL` | (empty) | Custom API endpoint |
 | `aiCodingAgent.temperature` | `0.7` | Creativity |
 | `aiCodingAgent.maxTokens` | `4096` | Response limit |
+| `aiCodingAgent.maxAgentSteps` | `500` | Agent loop safety cap |
+| `aiCodingAgent.toolApprovalLevel` | `writeOnly` | Approval: always / writeOnly / never |
 | `aiCodingAgent.completionsEnabled` | `true` | Enable completions |
 | `aiCodingAgent.completionDebounceMs` | `300` | Completion trigger delay |
 | `aiCodingAgent.completionTemperature` | `0.0` | Completion determinism |
@@ -85,8 +89,8 @@ npx vsce package
 extension_plugin/
 ├── src/                    # Extension host
 │   ├── extension.ts        # Entry point
-│   ├── ai/                 # AI core
-│   ├── tools/              # 7 tools
+│   ├── ai/                 # AI core (agent-loop, api-client, chat-engine, stream-bridge, ai-logger)
+│   ├── tools/              # 8 tools (incl. diff_file)
 │   ├── chat/               # Panel, router, JSONL persistence
 │   ├── context/            # Context collectors
 │   ├── completion/         # InlineCompletionItemProvider
@@ -100,27 +104,21 @@ extension_plugin/
 | Layer | Technology |
 |-------|------------|
 | Extension | TypeScript + VS Code API |
-| AI | Vercel AI SDK |
+| AI Engine | Custom Anthropic Messages API client (SSE streaming) |
+| Agent Loop | Manual control, AI-driven stop, 500-step safety cap |
+| Tool Approval | Inline diff + Approve/Reject, supports edit_file/write_file preview |
 | Completion | DeepSeek FIM Beta (`/beta/completions`) |
 | UI | React 18 + Zustand + react-markdown |
-| Build | esbuild + Vite |
+| Diff | `diff` npm library (unified diff + line numbers + collapse) |
+| Logging | BytePilot output channel (AI requests / tool calls / API params) |
+| Build | esbuild + Vite, `npm run build` compiles both |
 | Storage | JSONL (`~/.ai-coding-agent/projects/`)
-
-## Completion
-
-Inline completion uses DeepSeek FIM API:
-
-```
-POST https://api.deepseek.com/beta/completions
-```
-
-Other providers supported by extending `src/ai/completion-engine.ts`.
 
 ## Supported Providers
 
 | Provider | Chat | Completion | Tools |
 |----------|------|------------|-------|
-| DeepSeek | ✅ (`/v1`) | ✅ (`/beta` FIM) | ✅ |
+| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ |
 | Anthropic | ✅ | ⚠️ Extend | ✅ |
 | OpenAI | ✅ | ⚠️ Extend | ✅ |
 | Ollama | ✅ | ⚠️ Extend | ✅ |

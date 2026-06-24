@@ -2,18 +2,21 @@
 
 [English](https://github.com/hjy-2004/bytepilot-vscode/blob/master/README_EN.md)
 
-Cursor-like AI coding assistant，完全运行在 VS Code 中。支持多 AI 提供商、内联代码补全、文件编辑、终端命令、多会话管理。
+类 Cursor 的 AI 编程助手，完全运行在 VS Code 中。支持多 AI 提供商、内联代码补全、文件编辑、终端命令、可视化 diff 审批、多会话管理。
 
 ## 功能
 
-- **Chat** — 侧边栏 AI 对话，流式响应
+- **Chat** — 侧边栏 AI 对话，流式响应，AI 自主决定何时停止
 - **Inline Completion** — 输入停顿自动触发灰色补全，Tab 接受
-- **File Editing** — 精准 `old_string → new_string` 替换，不重写整个文件（参考 Cursor/Claude Code 实现）
-- **Tool System** — 7 个内置工具：read / write / edit / search / list / command / diagnostics
+- **Visual Diff & Approval** — 文件编辑前显示可视化 diff，内联审批（Appro/Reject），不再弹窗
+- **File Editing** — 精准 `old_string → new_string` 替换，不重写整个文件
+- **Tool System** — 8 个内置工具：read / write / edit / search / list / command / diagnostics / diff
 - **Auto Config** — 首次启动自动读取 `.claude/settings.json`，零配置
-- **Multi-Session** — JSONL 持久化，创建/切换/删除会话，完整上下文保存
+- **Multi-Session** — JSONL 持久化，创建/切换/删除会话，工具调用和 diff 数据完整恢复
 - **Multi-Provider** — Anthropic / OpenAI / DeepSeek / Ollama，自动检测和路由
 - **Model Settings** — 点击标题栏模型标签，可视化切换 Provider / Model / Base URL / API Key
+- **Structured Logging** — BytePilot 输出频道记录 AI 请求参数、工具调用、API 详情
+- **@file References** — 输入 `@文件名` 自动搜索工作区文件，选中后附带文件内容作为上下文
 
 ## 快速开始
 
@@ -36,7 +39,7 @@ Cursor-like AI coding assistant，完全运行在 VS Code 中。支持多 AI 提
 git clone https://github.com/hjy-2004/bytepilot-vscode.git
 cd bytepilot-vscode
 npm install
-cd webview-ui && npm install && npm run build && cd ..
+cd webview-ui && npm install && cd ..
 npm run build
 ```
 
@@ -46,7 +49,6 @@ npm run build
 
 ```bash
 npx vsce package
-# 然后 Ctrl+Shift+P → Extensions: Install from VSIX
 ```
 
 ## 设置项
@@ -59,6 +61,8 @@ npx vsce package
 | `aiCodingAgent.baseURL` | (空) | 自定义 API 地址 |
 | `aiCodingAgent.temperature` | `0.7` | 创造性 |
 | `aiCodingAgent.maxTokens` | `4096` | 响应上限 |
+| `aiCodingAgent.maxAgentSteps` | `500` | Agent 循环安全上限 |
+| `aiCodingAgent.toolApprovalLevel` | `writeOnly` | 审批级别: always / writeOnly / never |
 | `aiCodingAgent.completionsEnabled` | `true` | 启用补全 |
 | `aiCodingAgent.completionDebounceMs` | `300` | 补全延迟 |
 | `aiCodingAgent.completionTemperature` | `0.0` | 补全确定性 |
@@ -85,8 +89,8 @@ npx vsce package
 extension_plugin/
 ├── src/                    # 扩展宿主 (TypeScript)
 │   ├── extension.ts        # 入口
-│   ├── ai/                 # AI 核心 (chat-engine, completion-engine, provider, stream-bridge)
-│   ├── tools/              # 7 个工具
+│   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, stream-bridge, ai-logger）
+│   ├── tools/              # 8 个工具（含 diff_file）
 │   ├── chat/               # 聊天面板、路由、JSONL 历史持久化
 │   ├── context/            # 上下文收集器
 │   ├── completion/         # InlineCompletionItemProvider (DeepSeek FIM)
@@ -100,33 +104,24 @@ extension_plugin/
 | 层 | 技术 |
 |------|------|
 | 扩展宿主 | TypeScript + VS Code API |
-| AI 框架 | Vercel AI SDK (`ai` + `@ai-sdk/openai` + `@ai-sdk/anthropic`) |
+| AI 引擎 | 自建 Anthropic Messages API 客户端（SSE 流式） |
+| Agent 循环 | 手动控制，AI 自主决定停止，500 步安全帽 |
+| 工具审批 | 内联 diff 视图 + Approve/Reject，支持 edit_file/write_file 预览 |
 | 内联补全 | DeepSeek FIM Beta (`/beta/completions`) |
 | 聊天界面 | React 18 + Zustand + react-markdown |
-| 构建 | esbuild (扩展) + Vite (WebView) |
+| Diff | `diff` npm 库（unified diff + 行号 + 折叠） |
+| 日志 | BytePilot 输出频道（AI 请求/工具调用/API 参数） |
+| 构建 | esbuild (扩展) + Vite (WebView)，`npm run build` 一键编译 |
 | 存储 | JSONL (`~/.ai-coding-agent/projects/`)
-
-## 补全校准
-
-内联补全基于 DeepSeek FIM (Fill-in-the-Middle) API：
-
-```
-POST https://api.deepseek.com/beta/completions
-{ model, prompt (prefix), suffix, max_tokens, temperature }
-```
-
-其他厂商的补全可通过扩展 `src/ai/completion-engine.ts` 实现。
 
 ## 支持的厂商
 
 | 厂商 | 对话 | 补全 | 工具 |
 |------|------|------|------|
-| DeepSeek | ✅ (`/v1` 协议) | ✅ (`/beta` FIM) | ✅ |
+| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ |
 | Anthropic (Claude) | ✅ | ⚠️ 需扩展 | ✅ |
 | OpenAI (GPT) | ✅ | ⚠️ 需扩展 | ✅ |
 | Ollama | ✅ | ⚠️ 需扩展 | ✅ |
-
-DeepSeek 自动检测并路由到最优协议。通过模型设置面板可随时切换。
 
 ## License
 
