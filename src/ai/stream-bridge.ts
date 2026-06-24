@@ -37,12 +37,13 @@ export class StreamBridge {
     id: string,
     name: string,
     result: string,
-    success: boolean
+    success: boolean,
+    diff?: import('../types/diff').UnifiedDiff,
   ): void {
     if (this.cancelled) return;
     this.callback?.({
       type: 'chat.toolResult',
-      payload: { id, name, result, success },
+      payload: { id, name, result, success, diff },
     });
   }
 

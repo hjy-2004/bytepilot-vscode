@@ -2,6 +2,7 @@ import { z } from 'zod';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
+import { computeDiffFromContent } from '../utils/diff-helper';
 
 export const writeFileTool: ToolDef = {
   name: 'write_file',
@@ -30,7 +31,22 @@ export const writeFileTool: ToolDef = {
       const dir = path.dirname(fullPath);
       await vscode.workspace.fs.createDirectory(vscode.Uri.file(dir));
       const uri = vscode.Uri.file(fullPath);
+
+      // Check if file already exists (for diff generation)
+      let original: string | null = null;
+      try {
+        original = (await vscode.workspace.fs.readFile(uri)).toString();
+      } catch {
+        // File doesn't exist yet — no diff to generate
+      }
+
       await vscode.workspace.fs.writeFile(uri, Buffer.from(args.content, 'utf-8'));
+
+      if (original !== null && ctx.onDiff) {
+        const unifiedDiff = computeDiffFromContent(args.filePath, original, args.content);
+        ctx.onDiff(unifiedDiff);
+      }
+
       return `Wrote ${args.content.split('\n').length} lines to "${args.filePath}".`;
     } catch (err: any) {
       return `Error writing file: ${err.message}`;

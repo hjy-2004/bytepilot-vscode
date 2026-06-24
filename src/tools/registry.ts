@@ -2,6 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { RegisteredTool, ToolExecutionContext, PermissionLevel } from '../types/tools';
 import type { ToolDef } from '../types/tools';
+import type { UnifiedDiff } from '../types/diff';
 import { logInfo, logError } from '../utils/logger';
 
 /**
@@ -26,6 +27,7 @@ export function buildTool(def: ToolDef): RegisteredTool {
 export class ToolRegistry {
   private tools = new Map<string, RegisteredTool>();
   private executionContext: ToolExecutionContext | null = null;
+  private lastDiffData: UnifiedDiff | undefined;
 
   register(t: RegisteredTool): void {
     if (this.tools.has(t.name)) throw new Error(`Tool "${t.name}" already registered.`);
@@ -48,7 +50,12 @@ export class ToolRegistry {
         parameters: t.inputSchema as z.ZodObject<any>,
         execute: async (args) => {
           if (!this.executionContext) throw new Error('Tool context not set');
-          return t.call(args, this.executionContext);
+          // Wire onDiff to capture any diff data the tool generates
+          const execCtx: ToolExecutionContext = {
+            ...this.executionContext,
+            onDiff: (diff: UnifiedDiff) => { this.lastDiffData = diff; },
+          };
+          return t.call(args, execCtx);
         },
       });
     }
@@ -75,7 +82,11 @@ export class ToolRegistry {
     if (!t) throw new Error(`Tool "${name}" not found`);
     if (!this.executionContext) throw new Error('Tool context not set');
     try {
-      return await t.call(args, this.executionContext);
+      const execCtx: ToolExecutionContext = {
+        ...this.executionContext,
+        onDiff: (diff: UnifiedDiff) => { this.lastDiffData = diff; },
+      };
+      return await t.call(args, execCtx);
     } catch (err: any) {
       logError(`Tool ${name} failed`, err);
       return `Error: ${err.message}`;
@@ -88,6 +99,13 @@ export class ToolRegistry {
 
   getDisplayName(name: string): string | undefined {
     return this.tools.get(name)?.displayName;
+  }
+
+  /** Consume diff data stashed by the last tool execution. Call once after each tool-result. */
+  consumeLastDiff(): UnifiedDiff | undefined {
+    const d = this.lastDiffData;
+    this.lastDiffData = undefined;
+    return d;
   }
 
   get(name: string): RegisteredTool | undefined {

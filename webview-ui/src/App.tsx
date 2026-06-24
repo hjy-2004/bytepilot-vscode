@@ -32,7 +32,7 @@ const App: React.FC = () => {
         store.addToolCall(msg.payload.id, msg.payload.name, msg.payload.displayName, msg.payload.args);
         break;
       case 'chat.toolResult':
-        store.updateToolResult(msg.payload.id, msg.payload.result, msg.payload.success);
+        store.updateToolResult(msg.payload.id, msg.payload.result, msg.payload.success, msg.payload.diff);
         break;
       case 'chat.done':
         store.finalizeMessage(msg.payload.usage);

@@ -151,8 +151,9 @@ export class ChatEngine {
           this.lastToolCalls.push({ id: c.toolCallId, name: c.toolName, displayName: dn, args: (c.args || {}) as Record<string, unknown> });
           this.streamBridge.sendToolCall(c.toolCallId, c.toolName, dn, (c.args || {}) as Record<string, unknown>);
         } else if (c.type === 'tool-result' && c.toolCallId && c.toolName) {
+          const diff = this.toolRegistry.consumeLastDiff();
           this.lastToolResults.push({ id: c.toolCallId, name: c.toolName, result: String(c.result ?? ''), success: !c.error });
-          this.streamBridge.sendToolResult(c.toolCallId, c.toolName, String(c.result ?? ''), !c.error);
+          this.streamBridge.sendToolResult(c.toolCallId, c.toolName, String(c.result ?? ''), !c.error, diff);
         } else if (c.type === 'error') {
           throw c.error;
         }

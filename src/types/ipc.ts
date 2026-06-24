@@ -114,6 +114,7 @@ export interface ChatToolResultMessage {
     name: string;
     result: string;
     success: boolean;
+    diff?: import('./diff').UnifiedDiff;
   };
 }
 

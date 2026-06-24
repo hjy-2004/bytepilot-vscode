@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { UnifiedDiff } from './diff';
 
 /** Permission level for tool execution */
 export type PermissionLevel = 'read' | 'write' | 'notify';
@@ -8,6 +9,8 @@ export interface ToolExecutionContext {
   workspaceRoot: string;
   signal: AbortSignal;
   onProgress?: (message: string) => void;
+  /** If set, tools should call this after making file changes to surface a visual diff in the UI */
+  onDiff?: (diff: UnifiedDiff) => void;
 }
 
 /** A fully-defined tool, following Claude Code's buildTool pattern */

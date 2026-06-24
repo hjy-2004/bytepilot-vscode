@@ -2,6 +2,7 @@ import { z } from 'zod';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
+import { computeDiffFromContent } from '../utils/diff-helper';
 
 const MAX_FILE_SIZE = 500 * 1024; // 500KB
 
@@ -96,6 +97,12 @@ export const editFileTool: ToolDef = {
       const edited = isCRLF ? editedNormalized.replace(/\n/g, '\r\n') : editedNormalized;
 
       await vscode.workspace.fs.writeFile(uri, Buffer.from(edited, 'utf-8'));
+
+      // Generate visual diff for the UI
+      if (ctx.onDiff) {
+        const unifiedDiff = computeDiffFromContent(args.filePath, original, edited);
+        ctx.onDiff(unifiedDiff);
+      }
 
       const changedLines = (edited.match(/\n/g) || []).length - (original.match(/\n/g) || []).length;
       const changed = changedLines !== 0 ? ` (${changedLines > 0 ? '+' : ''}${changedLines} lines)` : '';

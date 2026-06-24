@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { UnifiedDiff } from '../types/diff';
 
 export interface ChatMessage {
   id: string;
@@ -16,6 +17,7 @@ export interface ToolCallEntry {
   result?: string;
   success?: boolean;
   status: 'pending' | 'running' | 'done' | 'error';
+  diff?: UnifiedDiff;
 }
 
 export interface ConfigState {
@@ -55,7 +57,7 @@ interface ChatStore {
   appendStreamChunk: (text: string) => void;
   finalizeMessage: (usage?: { inputTokens: number; outputTokens: number }) => void;
   addToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>) => void;
-  updateToolResult: (id: string, result: string, success: boolean) => void;
+  updateToolResult: (id: string, result: string, success: boolean, diff?: UnifiedDiff) => void;
   setStreaming: (streaming: boolean) => void;
   clearMessages: () => void;
   setConfig: (config: ConfigState) => void;
@@ -134,14 +136,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  updateToolResult: (id, result, success) => {
+  updateToolResult: (id, result, success, diff?) => {
     set((s) => ({
       messages: s.messages.map((m) => {
         if (m.toolCalls) {
           return {
             ...m,
             toolCalls: m.toolCalls.map((tc) =>
-              tc.id === id ? { ...tc, result, success, status: success ? ('done' as const) : ('error' as const) } : tc
+              tc.id === id ? { ...tc, result, success, diff, status: success ? ('done' as const) : ('error' as const) } : tc
             ),
           };
         }

@@ -26,6 +26,7 @@ import { listDirectoryTool } from './tools/list-directory';
 import { executeCommandTool } from './tools/execute-command';
 import { readDiagnosticsTool } from './tools/read-diagnostics';
 import { editFileTool } from './tools/edit-file';
+import { diffFileTool } from './tools/diff-file';
 
 let disposables: DisposableStore;
 let providerManager: ProviderManager;
@@ -60,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     listDirectoryTool as any,
     executeCommandTool as any,
     readDiagnosticsTool as any,
+    diffFileTool as any,
   ]);
 
   // Set workspace context for tools

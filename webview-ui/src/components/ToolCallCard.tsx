@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ToolCallEntry } from '../state/chat-store';
+import { DiffView } from './DiffView';
 
 interface ToolCallCardProps {
   toolCall: ToolCallEntry;
@@ -74,21 +75,25 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
               <div style={{ fontWeight: 600, marginBottom: '2px' }}>
                 Result ({toolCall.success ? 'Success' : 'Error'}):
               </div>
-              <pre style={{
-                background: 'var(--vscode-textCodeBlock-background)',
-                padding: '4px 8px',
-                borderRadius: '3px',
-                fontSize: '11px',
-                overflow: 'auto',
-                maxHeight: '200px',
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}>
-                {toolCall.result.length > 2000
-                  ? toolCall.result.slice(0, 2000) + '\n...(truncated)'
-                  : toolCall.result}
-              </pre>
+              {toolCall.diff ? (
+                <DiffView diff={toolCall.diff} />
+              ) : (
+                <pre style={{
+                  background: 'var(--vscode-textCodeBlock-background)',
+                  padding: '4px 8px',
+                  borderRadius: '3px',
+                  fontSize: '11px',
+                  overflow: 'auto',
+                  maxHeight: '200px',
+                  margin: 0,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}>
+                  {toolCall.result.length > 2000
+                    ? toolCall.result.slice(0, 2000) + '\n...(truncated)'
+                    : toolCall.result}
+                </pre>
+              )}
             </div>
           )}
         </div>
