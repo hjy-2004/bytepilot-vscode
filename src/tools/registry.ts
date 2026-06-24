@@ -29,6 +29,7 @@ export class ToolRegistry {
   private tools = new Map<string, RegisteredTool>();
   private executionContext: ToolExecutionContext | null = null;
   private lastDiffData: UnifiedDiff | undefined;
+  private pendingApprovalFn: ((toolName: string, displayName: string, args: Record<string, unknown>) => Promise<boolean>) | null = null;
 
   register(t: RegisteredTool): void {
     if (this.tools.has(t.name)) throw new Error(`Tool "${t.name}" already registered.`);
@@ -50,12 +51,21 @@ export class ToolRegistry {
         description: t.description,
         parameters: t.inputSchema as z.ZodObject<any>,
         execute: async (args) => {
+          logInfo(`[Execute] ${t.name}: START — pendingApprovalFn=${!!this.pendingApprovalFn}`);
           if (!this.executionContext) throw new Error('Tool context not set');
-          // Wire onDiff to capture any diff data the tool generates
           const execCtx: ToolExecutionContext = {
             ...this.executionContext,
             onDiff: (diff: UnifiedDiff) => { this.lastDiffData = diff; },
           };
+
+          // Check approval for write tools - blocks until user responds
+          if (!t.isReadOnly() && this.pendingApprovalFn) {
+            logInfo(`[Approval] Requesting approval for ${t.name} — blocking...`);
+            const approved = await this.pendingApprovalFn(t.name, t.displayName, args as Record<string, unknown>);
+            logInfo(`[Approval] Result for ${t.name}: ${approved ? 'approved' : 'rejected'}`);
+            if (!approved) return 'Error: Tool execution was rejected by user.';
+          }
+
           const startTime = Date.now();
           logToolCallStart({
             toolCallId: t.name,
@@ -114,6 +124,11 @@ export class ToolRegistry {
 
   getDisplayName(name: string): string | undefined {
     return this.tools.get(name)?.displayName;
+  }
+
+  /** Set approval function for write tools. Called before each tool execution. */
+  setApprovalFn(fn: ((toolName: string, displayName: string, args: Record<string, unknown>) => Promise<boolean>) | null): void {
+    this.pendingApprovalFn = fn;
   }
 
   /** Consume diff data stashed by the last tool execution. Call once after each tool-result. */

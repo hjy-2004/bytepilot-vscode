@@ -11,6 +11,8 @@ export interface ToolExecutionContext {
   onProgress?: (message: string) => void;
   /** If set, tools should call this after making file changes to surface a visual diff in the UI */
   onDiff?: (diff: UnifiedDiff) => void;
+  /** If set, execute() calls this before running non-readOnly tools. Return false to reject. */
+  onApproval?: (toolName: string, displayName: string, args: Record<string, unknown>) => Promise<boolean>;
 }
 
 /** A fully-defined tool, following Claude Code's buildTool pattern */

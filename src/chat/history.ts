@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { CoreMessage } from 'ai';
+import type { Message } from '../ai/message-types';
 import { logInfo, logError } from '../utils/logger';
 import type { UnifiedDiff } from '../types/diff';
 
@@ -166,7 +166,7 @@ export function saveMessage(
   }
 }
 
-export function loadSessionMessages(workspacePath: string, sessionId: string): CoreMessage[] {
+export function loadSessionMessages(workspacePath: string, sessionId: string): Message[] {
   if (!workspacePath) return [];
   try {
     const filePath = path.join(getProjectDir(workspacePath), `${sessionId}.jsonl`);
@@ -183,7 +183,7 @@ export function loadSessionMessages(workspacePath: string, sessionId: string): C
       } catch {}
     }
     logInfo(`Loaded ${entries.length} messages from session ${sessionId}`);
-    return entries.reverse().map(e => ({ role: e.role, content: e.content } as CoreMessage));
+    return entries.reverse().map(e => ({ role: e.role, content: e.content } as Message));
   } catch (err) {
     logError('Failed to load session messages', err);
     return [];
@@ -230,7 +230,7 @@ function pruneSessionFile(filePath: string): void {
 export function saveFullHistory(
   workspacePath: string,
   sessionId: string,
-  messages: CoreMessage[],
+  messages: Message[],
   toolDiffs?: Map<string, UnifiedDiff>,
 ): void {
   if (!workspacePath || !sessionId) return;

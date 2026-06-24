@@ -88,7 +88,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       try {
         const model = providerManager.getChatModel();
         const cfg = getConfigState();
-        const engine = new ChatEngine(model, toolRegistry, () => contextCollector.getContextString(), cfg.provider, cfg.baseURL);
+        const engine = new ChatEngine(model, toolRegistry, () => contextCollector.getContextString(), cfg.provider, cfg.baseURL, providerManager.getConfig()?.apiKey);
         engine.setWorkspacePath(getWorkspaceRoot());
         engine.setSessionIdProvider(() => messageRouter?.getActiveSession() || '');
         return engine;
@@ -157,6 +157,7 @@ function createChatEngine(): void {
       () => contextCollector.getContextString(),
       cfg.provider,
       cfg.baseURL,
+      providerManager.getConfig()?.apiKey,
     );
     const wsPath = getWorkspaceRoot();
     chatEngine.setWorkspacePath(wsPath);

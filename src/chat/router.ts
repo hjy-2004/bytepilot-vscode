@@ -7,7 +7,7 @@ import { scanKnownLocations, importCachedConfig } from '../config/importer';
 import { listSessions, createSession as createSessionFile, switchSession as switchSessionFile, deleteSession as deleteSessionFile, loadSessionMessages, loadSessionDiffs } from './history';
 import { logInfo, logError } from '../utils/logger';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
-import type { CoreMessage } from 'ai';
+import type { Message } from '../ai/message-types';
 
 type PostMessageFn = (msg: ExtensionMessage) => void;
 
@@ -91,8 +91,12 @@ export class MessageRouter implements vscode.Disposable {
     const reply = (msg: ExtensionMessage) => {
       if (respond) {
         respond(msg);
+        logInfo(`[IPC] Sent ${msg.type} via respond`);
+      } else if (ChatPanel.current()) {
+        ChatPanel.current()!.postMessage(msg);
+        logInfo(`[IPC] Sent ${msg.type} via ChatPanel`);
       } else {
-        ChatPanel.current()?.postMessage(msg);
+        logInfo(`[IPC] FAILED to send ${msg.type} — no transport available!`);
       }
     };
 
@@ -118,15 +122,17 @@ export class MessageRouter implements vscode.Disposable {
           await this.chatEngine.sendMessage(
             message.payload.content,
             async (toolCallId, toolName, displayName, args) => {
+              logInfo(`[Approval] Requesting for ${toolName} (${toolCallId})`);
+              logInfo(`[Approval] Sending to webview: ${this.streamResponder ? 'via streamResponder' : 'via ChatPanel'}`);
               reply({ type: 'tool.requestApproval', payload: { toolCallId, toolName, displayName, args } });
-              return new Promise((resolve, reject) => {
-                this.pendingApprovalResolver.set(toolCallId, { resolve, reject });
+              return new Promise((resolve) => {
+                this.pendingApprovalResolver.set(toolCallId, { resolve, reject: () => resolve(false) });
                 setTimeout(() => {
                   if (this.pendingApprovalResolver.has(toolCallId)) {
                     this.pendingApprovalResolver.delete(toolCallId);
                     resolve(false);
                   }
-                }, 60000);
+                }, 300000);
               });
             }
           );
@@ -332,7 +338,7 @@ export class MessageRouter implements vscode.Disposable {
    * Used by both chat.restore (in-memory) and session.switch (disk-loaded).
    */
   private extractRestoreMessages(
-    history: CoreMessage[],
+    history: Message[],
     diffs?: Map<string, import('../types/diff').UnifiedDiff>,
   ): Array<{
     id: string;

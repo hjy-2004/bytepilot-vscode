@@ -198,13 +198,14 @@
     }
   },
   "scripts": {
-    "build": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs && cd webview-ui && npm run build",
+    "build:ext": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "build:webview": "cd webview-ui && npm run build",
     "dev:webview": "cd webview-ui && npm run dev",
     "lint": "eslint src --ext .ts",
     "package": "vsce package",
-    "vscode:prepublish": "npm run build && npm run build:webview"
+    "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
     "@types/diff": "^7.0.0",
