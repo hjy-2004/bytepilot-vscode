@@ -167,8 +167,10 @@ export class MessageRouter implements vscode.Disposable {
 
           const history = this.chatEngine.getHistory();
           const ws = this.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+          const sid = this.getActiveSession();
           // Load diffs from disk (in-memory toolDiffs is cleared after saveFullHistory)
-          const diffs = loadSessionDiffs(ws, this.activeSessionId || '');
+          const diffs = sid ? loadSessionDiffs(ws, sid) : new Map();
+          logInfo(`chat.restore: loaded ${diffs.size} diffs from disk for session ${sid}`);
           reply({
             type: 'chat.state',
             payload: { messages: this.extractRestoreMessages(history, diffs) },
@@ -424,7 +426,7 @@ export class MessageRouter implements vscode.Disposable {
       messages.push({
         id: `rest_${i}`,
         role: m.role as 'user' | 'assistant',
-        content: text || '(tool calls)',
+        content: text,
         timestamp: Date.now() - (history.length - i) * 1000,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       });

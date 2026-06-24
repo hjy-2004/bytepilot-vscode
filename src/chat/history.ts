@@ -236,6 +236,15 @@ export function saveFullHistory(
   if (!workspacePath || !sessionId) return;
   try {
     const filePath = path.join(getProjectDir(workspacePath), `${sessionId}.jsonl`);
+
+    // Load existing diffs so they survive across writes (each response overwrites the file)
+    const existingDiffs = loadSessionDiffs(workspacePath, sessionId);
+    if (toolDiffs) {
+      for (const [id, diff] of toolDiffs) {
+        existingDiffs.set(id, diff);
+      }
+    }
+
     const entries = messages
       .filter(m => m.role !== 'system')
       .map(m => ({
@@ -244,9 +253,9 @@ export function saveFullHistory(
         timestamp: Date.now(),
       }));
 
-    // Append diff data as __diff entries (for UI restore, not sent to AI)
-    if (toolDiffs && toolDiffs.size > 0) {
-      for (const [toolCallId, diff] of toolDiffs) {
+    // Append all diffs as __diff entries (for UI restore, not sent to AI)
+    if (existingDiffs.size > 0) {
+      for (const [toolCallId, diff] of existingDiffs) {
         entries.push({ role: '__diff', content: { toolCallId, diff }, timestamp: Date.now() });
       }
     }
