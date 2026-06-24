@@ -6,7 +6,7 @@ interface ToolCallCardProps {
   toolCall: ToolCallEntry;
 }
 
-export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
+export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall }) => {
   const [expanded, setExpanded] = useState(false);
 
   const statusIcon = toolCall.status === 'running'
@@ -100,4 +100,4 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
       )}
     </div>
   );
-};
+});

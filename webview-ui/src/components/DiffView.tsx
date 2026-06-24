@@ -7,7 +7,7 @@ interface DiffViewProps {
 
 const COLLAPSE_THRESHOLD = 5;
 
-export const DiffView: React.FC<DiffViewProps> = ({ diff }) => {
+export const DiffView: React.FC<DiffViewProps> = React.memo(({ diff }) => {
   if (!diff.hunks.length) {
     return (
       <div style={{
@@ -54,7 +54,7 @@ export const DiffView: React.FC<DiffViewProps> = ({ diff }) => {
       </div>
     </div>
   );
-};
+});
 
 const DiffHeader: React.FC<{ fileName: string; stats: UnifiedDiff['stats'] }> = ({ fileName, stats }) => (
   <div style={{

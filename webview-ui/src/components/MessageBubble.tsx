@@ -10,7 +10,7 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isStreaming }) => {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
 
@@ -123,4 +123,4 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreami
       </div>
     </div>
   );
-};
+});

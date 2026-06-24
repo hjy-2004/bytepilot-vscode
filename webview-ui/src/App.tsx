@@ -15,7 +15,15 @@ interface SessionInfo {
 
 const App: React.FC = () => {
   const { postMessage } = useVSCode();
-  const store = useChatStore();
+
+  // Use individual selectors to avoid re-rendering on unrelated store changes
+  const messages = useChatStore((s) => s.messages);
+  const streamingText = useChatStore((s) => s.streamingText);
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const config = useChatStore((s) => s.config);
+  const configLoaded = useChatStore((s) => s.configLoaded);
+  const contextInfo = useChatStore((s) => s.contextInfo);
+  const permissionRequest = useChatStore((s) => s.permissionRequest);
 
   const [foundConfigs, setFoundConfigs] = useState<FoundConfig[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -24,6 +32,7 @@ const App: React.FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const handleExtensionMessage = useCallback((msg: ExtensionMessage) => {
+    const store = useChatStore.getState();
     switch (msg.type) {
       case 'chat.token':
         store.appendStreamChunk(msg.payload.text);
@@ -68,33 +77,33 @@ const App: React.FC = () => {
       case 'session.list':
         setSessions(msg.payload.sessions);
         if (msg.payload.sessions.length > 0) {
-          setActiveSessionId(prev => prev || msg.payload.sessions[0].id);
+          setActiveSessionId((prev) => prev || msg.payload.sessions[0].id);
         }
         break;
     }
-  }, [store]);
+  }, []);
 
   useOnExtensionMessage(handleExtensionMessage);
 
   const handleSend = useCallback((content: string) => {
-    store.addUserMessage(content);
+    useChatStore.getState().addUserMessage(content);
     postMessage({ type: 'chat.send', payload: { content } } as any);
-  }, [postMessage, store]);
+  }, [postMessage]);
 
   const handleCancel = useCallback(() => {
     postMessage({ type: 'chat.cancel' } as any);
-    store.setStreaming(false);
-  }, [postMessage, store]);
+    useChatStore.getState().setStreaming(false);
+  }, [postMessage]);
 
   const handleApproveTool = useCallback((toolCallId: string) => {
     postMessage({ type: 'tool.approve', payload: { toolCallId } } as any);
-    store.setPermissionRequest(null);
-  }, [postMessage, store]);
+    useChatStore.getState().setPermissionRequest(null);
+  }, [postMessage]);
 
   const handleRejectTool = useCallback((toolCallId: string) => {
     postMessage({ type: 'tool.reject', payload: { toolCallId, reason: 'User rejected' } } as any);
-    store.setPermissionRequest(null);
-  }, [postMessage, store]);
+    useChatStore.getState().setPermissionRequest(null);
+  }, [postMessage]);
 
   // Setup handlers
   const handleSetupScan = useCallback(() => {
@@ -133,14 +142,14 @@ const App: React.FC = () => {
     postMessage({ type: 'config.set', payload: settings } as any);
   }, [postMessage]);
 
-  const isConfigured = !!(store.config?.initialized);
+  const isConfigured = !!(config?.initialized);
 
   // Auto-scan only after config.loaded confirms no config exists
   useEffect(() => {
-    if (store.configLoaded && !isConfigured && !scanDone && !isScanning) {
+    if (configLoaded && !isConfigured && !scanDone && !isScanning) {
       handleSetupScan();
     }
-  }, [store.configLoaded, isConfigured]);
+  }, [configLoaded, isConfigured, scanDone, isScanning, handleSetupScan]);
 
   // Session handlers
   const refreshSessionList = useCallback(() => {
@@ -148,16 +157,16 @@ const App: React.FC = () => {
   }, [postMessage]);
 
   const handleNewSession = useCallback(() => {
-    store.clearMessages();
+    useChatStore.getState().clearMessages();
     postMessage({ type: 'session.create' } as any);
     setTimeout(refreshSessionList, 200);
-  }, [postMessage, store, refreshSessionList]);
+  }, [postMessage, refreshSessionList]);
 
   const handleSwitchSession = useCallback((id: string) => {
-    store.clearMessages();
+    useChatStore.getState().clearMessages();
     setActiveSessionId(id);
     postMessage({ type: 'session.switch', payload: { sessionId: id } } as any);
-  }, [postMessage, store]);
+  }, [postMessage]);
 
   const handleDeleteSession = useCallback((id: string) => {
     postMessage({ type: 'session.delete', payload: { sessionId: id } } as any);
@@ -173,7 +182,7 @@ const App: React.FC = () => {
 
   return (
     <>
-      {!store.configLoaded ? (
+      {!configLoaded ? (
         <div style={{
           height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--vscode-descriptionForeground)', fontSize: '13px',
@@ -190,11 +199,11 @@ const App: React.FC = () => {
         />
       ) : (
         <ChatContainer
-          messages={store.messages}
-          streamingText={store.streamingText}
-          isStreaming={store.isStreaming}
-          contextInfo={store.contextInfo}
-          config={store.config}
+          messages={messages}
+          streamingText={streamingText}
+          isStreaming={isStreaming}
+          contextInfo={contextInfo}
+          config={config}
           onSend={handleSend}
           onCancel={handleCancel}
           onSetup={() => {
@@ -212,13 +221,13 @@ const App: React.FC = () => {
         />
       )}
 
-      {store.permissionRequest && (
+      {permissionRequest && (
         <PermissionDialog
-          toolName={store.permissionRequest.toolName}
-          displayName={store.permissionRequest.displayName}
-          args={store.permissionRequest.args}
-          onApprove={() => handleApproveTool(store.permissionRequest!.toolCallId)}
-          onReject={() => handleRejectTool(store.permissionRequest!.toolCallId)}
+          toolName={permissionRequest.toolName}
+          displayName={permissionRequest.displayName}
+          args={permissionRequest.args}
+          onApprove={() => handleApproveTool(permissionRequest!.toolCallId)}
+          onReject={() => handleRejectTool(permissionRequest!.toolCallId)}
         />
       )}
     </>
