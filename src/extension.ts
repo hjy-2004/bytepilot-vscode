@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { ChatPanel } from './chat/panel';
 import { DisposableStore } from './utils/disposable';
 import { logInfo, logError, disposeLogger, getLogger } from './utils/logger';
+import { setDevMode } from './utils/ai-logger';
 import { ProviderManager } from './ai/provider-manager';
 import { SecretsStore } from './ai/secrets-store';
 import { ChatEngine } from './ai/chat-engine';
@@ -38,6 +39,7 @@ let inlineProvider: InlineCompletionProvider;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   logInfo('AI Coding Agent activating...');
+  setDevMode(context.extensionMode === vscode.ExtensionMode.Development);
   disposables = new DisposableStore();
 
   // --- Context Collector ---
@@ -85,7 +87,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     () => {
       try {
         const model = providerManager.getChatModel();
-        const engine = new ChatEngine(model, toolRegistry, () => contextCollector.getContextString());
+        const cfg = getConfigState();
+        const engine = new ChatEngine(model, toolRegistry, () => contextCollector.getContextString(), cfg.provider, cfg.baseURL);
         engine.setWorkspacePath(getWorkspaceRoot());
         engine.setSessionIdProvider(() => messageRouter?.getActiveSession() || '');
         return engine;
@@ -147,10 +150,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 function createChatEngine(): void {
   try {
     const model = providerManager.getChatModel();
+    const cfg = getConfigState();
     chatEngine = new ChatEngine(
       model,
       toolRegistry,
-      () => contextCollector.getContextString()
+      () => contextCollector.getContextString(),
+      cfg.provider,
+      cfg.baseURL,
     );
     const wsPath = getWorkspaceRoot();
     chatEngine.setWorkspacePath(wsPath);

@@ -4,6 +4,7 @@ import type { RegisteredTool, ToolExecutionContext, PermissionLevel } from '../t
 import type { ToolDef } from '../types/tools';
 import type { UnifiedDiff } from '../types/diff';
 import { logInfo, logError } from '../utils/logger';
+import { logToolCallStart, logToolCallResult } from '../utils/ai-logger';
 
 /**
  * Build a complete registered tool from a definition, filling in defaults.
@@ -55,7 +56,21 @@ export class ToolRegistry {
             ...this.executionContext,
             onDiff: (diff: UnifiedDiff) => { this.lastDiffData = diff; },
           };
-          return t.call(args, execCtx);
+          const startTime = Date.now();
+          logToolCallStart({
+            toolCallId: t.name,
+            toolName: t.name,
+            displayName: t.displayName,
+            args: args as Record<string, unknown>,
+          });
+          try {
+            const result = await t.call(args, execCtx);
+            logToolCallResult(t.name, t.name, true, result, Date.now() - startTime);
+            return result;
+          } catch (err: any) {
+            logToolCallResult(t.name, t.name, false, err.message || 'Unknown error', Date.now() - startTime);
+            throw err;
+          }
         },
       });
     }

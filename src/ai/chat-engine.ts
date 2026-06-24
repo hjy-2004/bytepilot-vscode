@@ -3,6 +3,7 @@ import type { LanguageModelV1 } from 'ai';
 import { ToolRegistry } from '../tools/registry';
 import { StreamBridge } from './stream-bridge';
 import { logInfo, logError } from '../utils/logger';
+import { logAiRequestStart, logAiCompletion, logAiError } from '../utils/ai-logger';
 import { saveFullHistory } from '../chat/history';
 import type { PendingApproval } from '../types/chat';
 
@@ -41,12 +42,18 @@ export class ChatEngine {
   private lastToolResults: Array<{ id: string; name: string; result: string; success: boolean }> = [];
   private toolDiffs: Map<string, import('../types/diff').UnifiedDiff> = new Map();
   private lastError: string | null = null;
+  private readonly provider: string;
+  private readonly baseURL?: string;
 
   constructor(
     private readonly chatModel: LanguageModelV1,
     private readonly toolRegistry: ToolRegistry,
-    private readonly getSystemContext?: () => Promise<string>
+    private readonly getSystemContext?: () => Promise<string>,
+    provider?: string,
+    baseURL?: string,
   ) {
+    this.provider = provider || 'unknown';
+    this.baseURL = baseURL;
     this.streamBridge = new StreamBridge();
   }
 
@@ -129,6 +136,21 @@ export class ChatEngine {
     ];
 
     try {
+      const startTime = Date.now();
+      const tools = this.toolRegistry.list();
+      logAiRequestStart({
+        provider: this.provider,
+        model: (this.chatModel as any).modelId || 'unknown',
+        baseURL: this.baseURL,
+        temperature: 0.3,
+        maxTokens: 4096,
+        maxSteps: 15,
+        systemPromptLength: systemMessage.length,
+        messageCount: allMessages.length,
+        toolCount: tools.length,
+        toolNames: tools.map(t => t.name),
+      });
+
       // Use streamText for per-token streaming output with multi-step tool calling
       const result = streamText({
         model: this.chatModel,
@@ -176,11 +198,19 @@ export class ChatEngine {
 
       this.isGenerating = false;
       this.streamBridge.sendDone();
+
+      logAiCompletion({
+        inputTokens: (response as any).usage?.promptTokens,
+        outputTokens: (response as any).usage?.completionTokens,
+        durationMs: Date.now() - startTime,
+      });
+
       return;
     } catch (err: any) {
       if (err.name === 'AbortError') { this.isGenerating = false; throw err; }
       // If tools cause 400, retry without tools
       if (err.statusCode === 400 || (err.message && err.message.includes('Bad Request'))) {
+        logAiError('Tool calling not supported, retrying without tools', '400');
         logInfo('Tool call failed (400), retrying without tools');
         this.streamBridge.sendToken('(Tools unavailable, using basic chat)\n');
         try {
@@ -210,6 +240,7 @@ export class ChatEngine {
         } catch (retryErr: any) {
           if (retryErr.name === 'AbortError') { this.isGenerating = false; throw retryErr; }
           logError('Retry without tools also failed', retryErr);
+          logAiError(retryErr.message);
           this.lastError = retryErr.message;
           this.isGenerating = false;
           this.streamBridge.sendError(retryErr.message);
@@ -217,6 +248,7 @@ export class ChatEngine {
         }
       }
       logError('Error in chat loop', err);
+      logAiError(err.message, err.statusCode ? String(err.statusCode) : undefined);
       this.lastError = err.message;
       this.isGenerating = false;
       this.streamBridge.sendError(err.message);

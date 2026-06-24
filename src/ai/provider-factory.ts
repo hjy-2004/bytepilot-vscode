@@ -2,6 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { LanguageModelV1 } from 'ai';
 import type { ProviderConfig } from '../types/ai';
+import { logProviderConfig } from '../utils/ai-logger';
 
 /**
  * Pure factory: given a ProviderConfig, returns Vercel AI SDK LanguageModelV1 instances.
@@ -13,6 +14,8 @@ export function createProvider(config: ProviderConfig & { apiKey?: string }): {
   chatModel: LanguageModelV1;
   completionModel: LanguageModelV1;
 } {
+  logProviderConfig(config.provider, config.chatModel, config.completionModel, config.baseURL);
+
   switch (config.provider) {
     case 'openai': {
       const openai = createOpenAI({
