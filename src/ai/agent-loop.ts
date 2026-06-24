@@ -20,9 +20,9 @@ export async function runAgentLoop(
   systemPrompt: string,
   toolDefs: ToolDef[],
   cb: AgentCallbacks,
+  maxSteps: number,
   signal?: AbortSignal,
 ): Promise<void> {
-  const maxSteps = 15;
   const startTime = Date.now();
   const sm: Message = { role: 'system', content: systemPrompt };
 
@@ -40,12 +40,14 @@ export async function runAgentLoop(
   });
 
   let totalIn = 0, totalOut = 0;
+  let step = 0;
 
   try {
-    for (let step = 0; step < maxSteps; step++) {
+    while (step < maxSteps) {
+      step++;
       if (signal?.aborted) break;
       const allMessages: Message[] = [sm, ...history];
-      logInfo(`[AgentLoop] Step ${step + 1}/${maxSteps} — ${history.length} msgs`);
+      logInfo(`[AgentLoop] Step ${step} — ${history.length} msgs`);
 
       const result = await streamChat(config, allMessages, toolDefs, cb.onToken, signal);
       if (result.usage) { totalIn += result.usage.inputTokens; totalOut += result.usage.outputTokens; }
@@ -109,6 +111,12 @@ export async function runAgentLoop(
           cb.onToolResult(tc.id, tc.name, msg, false);
         }
       }
+    }
+
+    // Safety cap reached (AI didn't stop on its own)
+    if (step >= maxSteps) {
+      logInfo(`[AgentLoop] ⚠️ Safety cap (${maxSteps} steps) — task may be incomplete`);
+      cb.onToken(`\n\n⚠️ **Stopped at safety limit (${maxSteps} steps).** Task may be incomplete. Send another message to continue.\n\n`);
     }
   } catch (err: any) {
     if (err.name === 'AbortError') return;

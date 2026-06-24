@@ -169,6 +169,7 @@ export interface ToolRequestApprovalMessage {
     toolName: string;
     displayName: string;
     args: Record<string, unknown>;
+    diff?: import('./diff').UnifiedDiff;
   };
 }
 

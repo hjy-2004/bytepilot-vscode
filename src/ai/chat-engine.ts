@@ -143,7 +143,8 @@ export class ChatEngine {
 
     // Clean up old-format tool messages that might lack toolCallId
     this.history = this.history.filter(m => m.role !== 'tool' || m.toolCallId);
-    await runAgentLoop(cfg, this.history, systemPrompt, toolDefs, cb, this.abortController!.signal);
+    const maxSteps = parseInt(process.env.AI_CODING_MAX_STEPS || '500', 10) || 500;
+    await runAgentLoop(cfg, this.history, systemPrompt, toolDefs, cb, maxSteps, this.abortController!.signal);
 
     if (this.workspacePath && this.getSessionId) {
       saveFullHistory(this.workspacePath, this.getSessionId(), this.history as any, this.toolDiffs);

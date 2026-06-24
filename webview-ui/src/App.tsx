@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { ChatContainer } from './components/ChatContainer';
 import { SetupWizard, type FoundConfig } from './components/SetupWizard';
-import { PermissionDialog } from './components/PermissionDialog';
+
 import { useVSCode, useOnExtensionMessage } from './hooks/useVSCode';
 import { useChatStore } from './state/chat-store';
 import type { ExtensionMessage } from './types/ipc';
@@ -23,8 +23,6 @@ const App: React.FC = () => {
   const config = useChatStore((s) => s.config);
   const configLoaded = useChatStore((s) => s.configLoaded);
   const contextInfo = useChatStore((s) => s.contextInfo);
-  const permissionRequest = useChatStore((s) => s.permissionRequest);
-
   const [foundConfigs, setFoundConfigs] = useState<FoundConfig[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanDone, setScanDone] = useState(false);
@@ -61,12 +59,7 @@ const App: React.FC = () => {
         store.updateContext(msg.payload);
         break;
       case 'tool.requestApproval':
-        store.setPermissionRequest({
-          toolCallId: msg.payload.toolCallId,
-          toolName: msg.payload.toolName,
-          displayName: msg.payload.displayName,
-          args: msg.payload.args,
-        });
+        store.setToolPendingApproval(msg.payload.toolCallId, msg.payload.diff);
         break;
       case 'chat.clear':
         store.clearMessages();
@@ -221,15 +214,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {permissionRequest && (
-        <PermissionDialog
-          toolName={permissionRequest.toolName}
-          displayName={permissionRequest.displayName}
-          args={permissionRequest.args}
-          onApprove={() => handleApproveTool(permissionRequest!.toolCallId)}
-          onReject={() => handleRejectTool(permissionRequest!.toolCallId)}
-        />
-      )}
     </>
   );
 };

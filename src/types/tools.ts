@@ -38,6 +38,8 @@ export interface ToolDef<
   isReadOnly(): boolean;
   /** Human-readable summary of what was done (for UI) */
   getToolUseSummary?(args: Partial<z.infer<TInput>>): string;
+  /** Preview diff before approval. Called with tool args, returns diff or undefined if not applicable. */
+  getPreviewDiff?(args: z.infer<TInput>, ctx: ToolExecutionContext): Promise<UnifiedDiff | undefined>;
   /** Maximum characters in result before truncation (default 8000) */
   readonly maxResultChars: number;
 }

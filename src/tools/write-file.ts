@@ -22,6 +22,14 @@ export const writeFileTool: ToolDef = {
   getToolUseSummary(args) {
     return `${args.filePath} (${args.content?.length || 0} chars)`;
   },
+  async getPreviewDiff(args, ctx) {
+    try {
+      const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
+      const uri = vscode.Uri.file(fullPath);
+      const original = (await vscode.workspace.fs.readFile(uri)).toString();
+      return computeDiffFromContent(args.filePath, original, args.content);
+    } catch { return undefined; }
+  },
   async call(args, ctx) {
     const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
     if (!fullPath.startsWith(ctx.workspaceRoot + path.sep) && fullPath !== ctx.workspaceRoot) {

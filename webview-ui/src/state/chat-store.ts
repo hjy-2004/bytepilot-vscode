@@ -16,7 +16,7 @@ export interface ToolCallEntry {
   args: Record<string, unknown>;
   result?: string;
   success?: boolean;
-  status: 'pending' | 'running' | 'done' | 'error';
+  status: 'pending' | 'pending_approval' | 'running' | 'done' | 'error';
   diff?: UnifiedDiff;
 }
 
@@ -38,6 +38,7 @@ export interface PermissionRequest {
   toolName: string;
   displayName: string;
   args: Record<string, unknown>;
+  diff?: UnifiedDiff;
 }
 
 interface ChatStore {
@@ -57,6 +58,8 @@ interface ChatStore {
   appendStreamChunk: (text: string) => void;
   finalizeMessage: (usage?: { inputTokens: number; outputTokens: number }) => void;
   addToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>) => void;
+  setToolPendingApproval: (id: string, diff?: UnifiedDiff) => void;
+  setToolRunning: (id: string) => void;
   updateToolResult: (id: string, result: string, success: boolean, diff?: UnifiedDiff) => void;
   setStreaming: (streaming: boolean) => void;
   clearMessages: () => void;
@@ -136,6 +139,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
+  setToolPendingApproval: (id, diff) => {
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.toolCalls ? { ...m, toolCalls: m.toolCalls.map((tc) => tc.id === id ? { ...tc, status: 'pending_approval' as const, diff } : tc) } : m
+      ),
+    }));
+  },
+  setToolRunning: (id) => {
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.toolCalls ? { ...m, toolCalls: m.toolCalls.map((tc) => tc.id === id ? { ...tc, status: 'running' as const } : tc) } : m
+      ),
+    }));
+  },
   updateToolResult: (id, result, success, diff?) => {
     set((s) => ({
       messages: s.messages.map((m) => {

@@ -29,6 +29,20 @@ export const editFileTool: ToolDef = {
   getToolUseSummary(args) {
     return `${args.filePath}: replace ${args.oldString?.length || 0}→${args.newString?.length || 0} chars`;
   },
+  async getPreviewDiff(args, ctx) {
+    try {
+      const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
+      const uri = vscode.Uri.file(fullPath);
+      const original = (await vscode.workspace.fs.readFile(uri)).toString();
+      const nor = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      let idx = original.indexOf(args.oldString);
+      if (idx === -1) idx = nor(original).indexOf(nor(args.oldString));
+      if (idx === -1) return undefined;
+      const oldLen = nor(args.oldString).length;
+      const edited = nor(original).substring(0, idx) + nor(args.newString) + nor(original).substring(idx + oldLen);
+      return computeDiffFromContent(args.filePath, original, edited);
+    } catch { return undefined; }
+  },
   async call(args, ctx) {
     const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
     if (!fullPath.startsWith(ctx.workspaceRoot + path.sep) && fullPath !== ctx.workspaceRoot) {

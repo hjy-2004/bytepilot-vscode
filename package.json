@@ -193,6 +193,13 @@
           ],
           "default": "writeOnly",
           "description": "When to require user approval for tool calls. 'always' = every tool, 'writeOnly' = only write/execute tools, 'never' = never ask (dangerous)."
+        },
+        "aiCodingAgent.maxAgentSteps": {
+          "type": "number",
+          "default": 500,
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Maximum number of agent loop iterations per message (safety cap). Default 500."
         }
       }
     }

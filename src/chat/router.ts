@@ -123,8 +123,19 @@ export class MessageRouter implements vscode.Disposable {
             message.payload.content,
             async (toolCallId, toolName, displayName, args) => {
               logInfo(`[Approval] Requesting for ${toolName} (${toolCallId})`);
-              logInfo(`[Approval] Sending to webview: ${this.streamResponder ? 'via streamResponder' : 'via ChatPanel'}`);
-              reply({ type: 'tool.requestApproval', payload: { toolCallId, toolName, displayName, args } });
+              // Compute preview diff for file-editing tools
+              let previewDiff: import('../types/diff').UnifiedDiff | undefined;
+              const tool = this.toolRegistry.get(toolName);
+              if (tool?.getPreviewDiff) {
+                const ctx = this.toolRegistry.getExecutionContext();
+                if (ctx) {
+                  try {
+                    previewDiff = await tool.getPreviewDiff(args, ctx);
+                    logInfo(`[Approval] Preview diff computed: ${previewDiff ? 'yes' : 'no'}`);
+                  } catch (e) { logInfo(`[Approval] Preview diff failed: ${e}`); }
+                }
+              }
+              reply({ type: 'tool.requestApproval', payload: { toolCallId, toolName, displayName, args, diff: previewDiff } });
               return new Promise((resolve) => {
                 this.pendingApprovalResolver.set(toolCallId, { resolve, reject: () => resolve(false) });
                 setTimeout(() => {
