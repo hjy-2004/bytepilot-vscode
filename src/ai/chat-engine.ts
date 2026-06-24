@@ -39,6 +39,7 @@ export class ChatEngine {
   private lastStreamText: string = '';
   private lastToolCalls: Array<{ id: string; name: string; displayName: string; args: Record<string, unknown> }> = [];
   private lastToolResults: Array<{ id: string; name: string; result: string; success: boolean }> = [];
+  private toolDiffs: Map<string, import('../types/diff').UnifiedDiff> = new Map();
   private lastError: string | null = null;
 
   constructor(
@@ -152,6 +153,9 @@ export class ChatEngine {
           this.streamBridge.sendToolCall(c.toolCallId, c.toolName, dn, (c.args || {}) as Record<string, unknown>);
         } else if (c.type === 'tool-result' && c.toolCallId && c.toolName) {
           const diff = this.toolRegistry.consumeLastDiff();
+          if (diff) {
+            this.toolDiffs.set(c.toolCallId, diff);
+          }
           this.lastToolResults.push({ id: c.toolCallId, name: c.toolName, result: String(c.result ?? ''), success: !c.error });
           this.streamBridge.sendToolResult(c.toolCallId, c.toolName, String(c.result ?? ''), !c.error, diff);
         } else if (c.type === 'error') {
@@ -166,7 +170,8 @@ export class ChatEngine {
       }
       // Save full history (including tool calls) for session resume
       if (this.workspacePath && this.getSessionId) {
-        saveFullHistory(this.workspacePath, this.getSessionId(), this.history);
+        saveFullHistory(this.workspacePath, this.getSessionId(), this.history, this.toolDiffs);
+        this.toolDiffs.clear();
       }
 
       this.isGenerating = false;
@@ -198,7 +203,8 @@ export class ChatEngine {
           this.isGenerating = false;
           this.streamBridge.sendDone();
           if (this.workspacePath && this.getSessionId) {
-            saveFullHistory(this.workspacePath, this.getSessionId(), this.history);
+            saveFullHistory(this.workspacePath, this.getSessionId(), this.history, this.toolDiffs);
+            this.toolDiffs.clear();
           }
           return;
         } catch (retryErr: any) {
@@ -241,6 +247,11 @@ export class ChatEngine {
   /** Whether the engine is currently generating a response */
   getIsGenerating(): boolean {
     return this.isGenerating;
+  }
+
+  /** Get persisted tool diffs for session restore */
+  getToolDiffs(): Map<string, import('../types/diff').UnifiedDiff> {
+    return this.toolDiffs;
   }
 
   /** Get current stream state for reconnection */

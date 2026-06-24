@@ -4,9 +4,10 @@ import { ChatEngine } from '../ai/chat-engine';
 import { ToolRegistry } from '../tools/registry';
 import { getConfigState } from '../config/settings';
 import { scanKnownLocations, importCachedConfig } from '../config/importer';
-import { listSessions, createSession as createSessionFile, switchSession as switchSessionFile, deleteSession as deleteSessionFile, loadSessionMessages } from './history';
+import { listSessions, createSession as createSessionFile, switchSession as switchSessionFile, deleteSession as deleteSessionFile, loadSessionMessages, loadSessionDiffs } from './history';
 import { logInfo, logError } from '../utils/logger';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
+import type { CoreMessage } from 'ai';
 
 type PostMessageFn = (msg: ExtensionMessage) => void;
 
@@ -165,32 +166,13 @@ export class MessageRouter implements vscode.Disposable {
           }
 
           const history = this.chatEngine.getHistory();
-          const messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }> = [];
-          for (let i = 0; i < history.length; i++) {
-            const m = history[i];
-            if (m.role !== 'user' && m.role !== 'assistant') continue;
-            if (!m.content) continue;
-
-            let text = '';
-            if (typeof m.content === 'string') {
-              text = m.content;
-            } else if (Array.isArray(m.content)) {
-              text = m.content
-                .filter((p: any) => p.type === 'text' && p.text)
-                .map((p: any) => p.text)
-                .join('\n');
-            }
-            // Skip messages that are pure tool calls (no text)
-            if (!text.trim()) continue;
-
-            messages.push({
-              id: `rest_${i}`,
-              role: m.role as 'user' | 'assistant',
-              content: text,
-              timestamp: Date.now() - (history.length - i) * 1000,
-            });
-          }
-          reply({ type: 'chat.state', payload: { messages } });
+          const ws = this.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+          // Load diffs from disk (in-memory toolDiffs is cleared after saveFullHistory)
+          const diffs = loadSessionDiffs(ws, this.activeSessionId || '');
+          reply({
+            type: 'chat.state',
+            payload: { messages: this.extractRestoreMessages(history, diffs) },
+          });
         }
         break;
       }
@@ -304,17 +286,11 @@ export class MessageRouter implements vscode.Disposable {
           this.activeSessionId = targetId;
           this.onSessionSwitch?.(targetId);
           const msgs = loadSessionMessages(ws, targetId);
+          const diffs = loadSessionDiffs(ws, targetId);
           reply({
             type: 'chat.state',
             payload: {
-              messages: msgs
-                .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
-                .map((m, i) => ({
-                  id: `sess_${i}`,
-                  role: m.role as 'user' | 'assistant',
-                  content: typeof m.content === 'string' ? m.content : String(m.content),
-                  timestamp: Date.now() - i * 1000,
-                })),
+              messages: this.extractRestoreMessages(msgs, diffs),
             },
           });
         }
@@ -347,6 +323,114 @@ export class MessageRouter implements vscode.Disposable {
       default:
         logInfo(`Unhandled message type: ${(message as any).type}`);
     }
+  }
+
+  /**
+   * Extract human-readable messages with tool calls from AI SDK CoreMessage history.
+   * Used by both chat.restore (in-memory) and session.switch (disk-loaded).
+   */
+  private extractRestoreMessages(
+    history: CoreMessage[],
+    diffs?: Map<string, import('../types/diff').UnifiedDiff>,
+  ): Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: number;
+    toolCalls?: Array<{
+      id: string;
+      name: string;
+      displayName: string;
+      args: Record<string, unknown>;
+      result?: string;
+      success?: boolean;
+      status: 'done' | 'error';
+      diff?: import('../types/diff').UnifiedDiff;
+    }>;
+  }> {
+    // Collect tool results by toolCallId (from tool-role messages)
+    const toolResults = new Map<string, { result: string; success: boolean }>();
+    for (const m of history) {
+      if (m.role === 'tool' && Array.isArray(m.content)) {
+        for (const p of m.content as any[]) {
+          if (p.type === 'tool-result' && p.toolCallId) {
+            toolResults.set(p.toolCallId, {
+              result: typeof p.result === 'string' ? p.result : JSON.stringify(p.result ?? ''),
+              success: !(p as any).isError,
+            });
+          }
+        }
+      }
+    }
+
+    const messages: Array<{
+      id: string;
+      role: 'user' | 'assistant';
+      content: string;
+      timestamp: number;
+      toolCalls?: Array<{
+        id: string;
+        name: string;
+        displayName: string;
+        args: Record<string, unknown>;
+        result?: string;
+        success?: boolean;
+        status: 'done' | 'error';
+        diff?: import('../types/diff').UnifiedDiff;
+      }>;
+    }> = [];
+
+    for (let i = 0; i < history.length; i++) {
+      const m = history[i];
+      if (m.role !== 'user' && m.role !== 'assistant') continue;
+      if (!m.content) continue;
+
+      let text = '';
+      const toolCalls: Array<{
+        id: string;
+        name: string;
+        displayName: string;
+        args: Record<string, unknown>;
+        result?: string;
+        success?: boolean;
+        status: 'done' | 'error';
+        diff?: import('../types/diff').UnifiedDiff;
+      }> = [];
+
+      if (typeof m.content === 'string') {
+        text = m.content;
+      } else if (Array.isArray(m.content)) {
+        for (const p of m.content as any[]) {
+          if (p.type === 'text' && p.text) {
+            text += (text ? '\n' : '') + p.text;
+          } else if (p.type === 'tool-call' && p.toolCallId) {
+            const tr = toolResults.get(p.toolCallId);
+            toolCalls.push({
+              id: p.toolCallId,
+              name: p.toolName,
+              displayName: this.toolRegistry.getDisplayName(p.toolName) || p.toolName,
+              args: (p.args || {}) as Record<string, unknown>,
+              result: tr?.result,
+              success: tr?.success,
+              status: tr ? ('done' as const) : ('error' as const),
+              diff: diffs?.get(p.toolCallId),
+            });
+          }
+        }
+      }
+
+      if (!text.trim() && toolCalls.length === 0) continue;
+
+      messages.push({
+        id: `rest_${i}`,
+        role: m.role as 'user' | 'assistant',
+        content: text || '(tool calls)',
+        timestamp: Date.now() - (history.length - i) * 1000,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      });
+    }
+
+    return messages;
   }
 
   dispose(): void {

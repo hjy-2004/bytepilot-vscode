@@ -184,6 +184,16 @@ export interface ChatStateMessage {
       role: 'user' | 'assistant';
       content: string;
       timestamp: number;
+      toolCalls?: Array<{
+        id: string;
+        name: string;
+        displayName: string;
+        args: Record<string, unknown>;
+        result?: string;
+        success?: boolean;
+        status: 'done' | 'error';
+        diff?: import('./diff').UnifiedDiff;
+      }>;
     }>;
   };
 }

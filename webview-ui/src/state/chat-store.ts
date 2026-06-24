@@ -64,7 +64,7 @@ interface ChatStore {
   setPermissionRequest: (request: PermissionRequest | null) => void;
   updateContext: (info: { openFiles: string[]; projectFiles: number; diagnosticsCount: number }) => void;
   addErrorMessage: (content: string) => void;
-  restoreMessages: (msgs: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>) => void;
+  restoreMessages: (msgs: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number; toolCalls?: ToolCallEntry[] }>) => void;
 }
 
 let nextId = 0;
@@ -174,6 +174,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   restoreMessages: (msgs) => {
     if (msgs.length === 0) return;
-    set({ messages: msgs, streamingText: '', isStreaming: false });
+    set({
+      messages: msgs.map((m) => ({
+        ...m,
+        toolCalls: m.toolCalls || [],
+      })),
+      streamingText: '',
+      isStreaming: false,
+    });
   },
 }));

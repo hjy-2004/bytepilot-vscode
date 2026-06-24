@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CoreMessage } from 'ai';
 import { logInfo, logError } from '../utils/logger';
+import type { UnifiedDiff } from '../types/diff';
 
 /**
  * Session persistence following Claude Code's pattern:
@@ -26,8 +27,8 @@ export interface SessionInfo {
 }
 
 interface HistoryEntry {
-  role: 'user' | 'assistant';
-  content: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string | unknown[];
   timestamp: number;
 }
 
@@ -175,8 +176,10 @@ export function loadSessionMessages(workspacePath: string, sessionId: string): C
     const entries: HistoryEntry[] = [];
     for (let i = lines.length - 1; i >= 0 && entries.length < MAX_ENTRIES; i--) {
       try {
-        const e = JSON.parse(lines[i]) as HistoryEntry;
-        if (e.role && e.content) entries.push(e);
+        const e = JSON.parse(lines[i]) as { role: string; content: unknown; timestamp?: number };
+        if (e.role && e.content && e.role !== '__diff') {
+          entries.push({ role: e.role as HistoryEntry['role'], content: e.content as HistoryEntry['content'], timestamp: e.timestamp || 0 });
+        }
       } catch {}
     }
     logInfo(`Loaded ${entries.length} messages from session ${sessionId}`);
@@ -185,6 +188,28 @@ export function loadSessionMessages(workspacePath: string, sessionId: string): C
     logError('Failed to load session messages', err);
     return [];
   }
+}
+
+/** Load persisted tool diffs from a session JSONL file. Returns a map of toolCallId -> UnifiedDiff. */
+export function loadSessionDiffs(workspacePath: string, sessionId: string): Map<string, UnifiedDiff> {
+  const diffs = new Map<string, UnifiedDiff>();
+  if (!workspacePath) return diffs;
+  try {
+    const filePath = path.join(getProjectDir(workspacePath), `${sessionId}.jsonl`);
+    if (!fs.existsSync(filePath)) return diffs;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.trim().split('\n').filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const e = JSON.parse(lines[i]) as { role: string; content: any };
+        if (e.role === '__diff' && e.content?.toolCallId && e.content?.diff) {
+          diffs.set(e.content.toolCallId, e.content.diff as UnifiedDiff);
+        }
+      } catch {}
+    }
+    logInfo(`Loaded ${diffs.size} diffs from session ${sessionId}`);
+  } catch {}
+  return diffs;
 }
 
 function pruneSessionFile(filePath: string): void {
@@ -202,7 +227,12 @@ function pruneSessionFile(filePath: string): void {
 // Full history save/load (preserves tool context across sessions)
 // ============================================================
 
-export function saveFullHistory(workspacePath: string, sessionId: string, messages: CoreMessage[]): void {
+export function saveFullHistory(
+  workspacePath: string,
+  sessionId: string,
+  messages: CoreMessage[],
+  toolDiffs?: Map<string, UnifiedDiff>,
+): void {
   if (!workspacePath || !sessionId) return;
   try {
     const filePath = path.join(getProjectDir(workspacePath), `${sessionId}.jsonl`);
@@ -213,6 +243,14 @@ export function saveFullHistory(workspacePath: string, sessionId: string, messag
         content: m.content,
         timestamp: Date.now(),
       }));
+
+    // Append diff data as __diff entries (for UI restore, not sent to AI)
+    if (toolDiffs && toolDiffs.size > 0) {
+      for (const [toolCallId, diff] of toolDiffs) {
+        entries.push({ role: '__diff', content: { toolCallId, diff }, timestamp: Date.now() });
+      }
+    }
+
     const lines = entries.map(e => JSON.stringify(e) + '\n').join('');
     fs.writeFileSync(filePath, lines, { encoding: 'utf-8', mode: 0o600 });
     logInfo(`Saved ${entries.length} messages to session ${sessionId}`);
