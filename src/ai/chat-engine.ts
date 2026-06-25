@@ -4,6 +4,7 @@ import { StreamBridge } from './stream-bridge';
 import { logInfo, logError } from '../utils/logger';
 import { saveFullHistory } from '../chat/history';
 import { runAgentLoop, type AgentCallbacks } from './agent-loop';
+import * as vscode from 'vscode';
 import type { ApiConfig, ToolDef } from './api-client';
 import type { Message, Attachment } from './message-types';
 
@@ -133,7 +134,7 @@ export class ChatEngine {
       apiKey: this.apiKey,
       baseURL: this.baseURL,
       model: ((this.chatModel as any).modelId || 'unknown').replace(/\[.*\]$/, ''), // strip thinking budget suffix
-      maxTokens: 4096,
+      maxTokens: vscode.workspace.getConfiguration('aiCodingAgent').get<number>('maxTokens') ?? 4096,
       provider: this.provider,
     };
 
