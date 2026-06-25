@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { collectOpenFiles } from './open-files';
 import { collectProjectStructure } from './project-structure';
 import { collectDiagnostics } from './diagnostics';
@@ -24,11 +26,12 @@ export class ContextCollector {
   async collect(): Promise<ContextSnapshot> {
     this.updateWorkspaceRoot();
 
-    const [openFiles, projectStructure, diagnostics, selection] = await Promise.all([
+    const [openFiles, projectStructure, diagnostics, selection, rules] = await Promise.all([
       collectOpenFiles(this.workspaceRoot).catch(() => []),
       collectProjectStructure(this.workspaceRoot).catch(() => ''),
       Promise.resolve(collectDiagnostics()),
       Promise.resolve(collectSelection(this.workspaceRoot)),
+      collectProjectRules(this.workspaceRoot).catch(() => undefined),
     ]);
 
     return {
@@ -36,6 +39,7 @@ export class ContextCollector {
       projectStructure,
       diagnostics,
       activeSelection: selection,
+      projectRules: rules,
       timestamp: Date.now(),
     };
   }
@@ -43,6 +47,13 @@ export class ContextCollector {
   /** Format a context snapshot as a string for the AI system prompt */
   formatForPrompt(snapshot: ContextSnapshot): string {
     const parts: string[] = [];
+
+    // Project rules
+    if (snapshot.projectRules) {
+      parts.push('<project_rules>');
+      parts.push(snapshot.projectRules);
+      parts.push('</project_rules>');
+    }
 
     // Project structure
     if (snapshot.projectStructure) {
@@ -100,5 +111,19 @@ export class ContextCollector {
   async getContextString(): Promise<string> {
     const snapshot = await this.collect();
     return this.formatForPrompt(snapshot);
+  }
+}
+
+/** Read .bytepilotrules from workspace root (plain text / markdown) */
+async function collectProjectRules(workspaceRoot: string): Promise<string | undefined> {
+  const rulesPath = path.join(workspaceRoot, '.bytepilotrules');
+  try {
+    if (!fs.existsSync(rulesPath)) return undefined;
+    const content = fs.readFileSync(rulesPath, 'utf-8').trim();
+    if (!content) return undefined;
+    logInfo(`Loaded .bytepilotrules: ${content.length} chars`);
+    return content;
+  } catch {
+    return undefined;
   }
 }

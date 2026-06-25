@@ -147,10 +147,42 @@ export class ChatPanel {
   }
 
   private sendContextUpdate(): void {
-    // TODO: integrate with ContextCollector in Phase 5
+    // Collect real context info from the workspace
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    const openFiles: string[] = [];
+    let diagnosticsCount = 0;
+    let hasRules = false;
+
+    // Check for .bytepilotrules
+    if (wsRoot) {
+      try {
+        const rulesPath = path.join(wsRoot, '.bytepilotrules');
+        hasRules = fs.existsSync(rulesPath);
+      } catch { /* ignore */ }
+    }
+
+    // Collect open editor paths
+    const editors = vscode.window.visibleTextEditors;
+    for (const editor of editors) {
+      const docPath = editor.document.uri.fsPath;
+      if (wsRoot && docPath.startsWith(wsRoot)) {
+        openFiles.push(path.relative(wsRoot, docPath).replace(/\\/g, '/'));
+      } else {
+        openFiles.push(docPath);
+      }
+    }
+
+    // Collect diagnostics count
+    try {
+      const allDiagnostics = vscode.languages.getDiagnostics();
+      for (const [, diags] of allDiagnostics) {
+        diagnosticsCount += diags.filter((d) => d.severity <= vscode.DiagnosticSeverity.Warning).length;
+      }
+    } catch { /* ignore */ }
+
     this.postMessage({
       type: 'context.update',
-      payload: { openFiles: [], projectFiles: 0, diagnosticsCount: 0 },
+      payload: { openFiles, projectFiles: 0, diagnosticsCount, hasRules },
     });
   }
 
@@ -206,7 +238,7 @@ export class ChatPanel {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource}; font-src ${this.panel.webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource}; font-src ${this.panel.webview.cspSource}; img-src ${this.panel.webview.cspSource} data:;">
   ${styleUri ? `<link rel="stylesheet" href="${styleUri}">` : ''}
   <title>AI Chat</title>
   <style>

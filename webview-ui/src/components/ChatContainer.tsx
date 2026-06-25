@@ -17,9 +17,9 @@ interface ChatContainerProps {
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
-  contextInfo: { openFiles: string[]; projectFiles: number; diagnosticsCount: number };
+  contextInfo: { openFiles: string[]; projectFiles: number; diagnosticsCount: number; hasRules: boolean };
   config: ConfigState | null;
-  onSend: (content: string) => void;
+  onSend: (content: string, attachments?: Array<{ name: string; content: string; type: 'image'; mimeType: string }>) => void;
   onCancel: () => void;
   onSetup: () => void;
   onChangeModel: (model: string) => void;
@@ -76,6 +76,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         openFiles={contextInfo.openFiles}
         projectFiles={contextInfo.projectFiles}
         diagnosticsCount={contextInfo.diagnosticsCount}
+        hasRules={contextInfo.hasRules}
       />
 
       {/* Messages or Welcome/Setup */}

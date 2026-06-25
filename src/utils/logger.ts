@@ -4,7 +4,7 @@ let outputChannel: vscode.OutputChannel | null = null;
 
 export function getLogger(): vscode.OutputChannel {
   if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel('AI Coding Agent', { log: true });
+    outputChannel = vscode.window.createOutputChannel('BytePilot', { log: true });
   }
   return outputChannel;
 }
@@ -30,4 +30,8 @@ export function disposeLogger(): void {
     outputChannel.dispose();
     outputChannel = null;
   }
+}
+
+export function showLogger(preserveFocus?: boolean): void {
+  getLogger().show(preserveFocus ?? false);
 }

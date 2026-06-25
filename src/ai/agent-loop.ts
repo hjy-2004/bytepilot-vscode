@@ -27,7 +27,7 @@ export async function runAgentLoop(
   const sm: Message = { role: 'system', content: systemPrompt };
 
   logAiRequestStart({
-    provider: 'anthropic',
+    provider: config.provider || 'anthropic',
     model: config.model,
     baseURL: config.baseURL,
     temperature: 0,

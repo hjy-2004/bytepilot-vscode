@@ -12,6 +12,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
   private disposables: vscode.Disposable[] = [];
   private getApiKey?: () => string | undefined;
   private getBaseURL?: () => string | undefined;
+  private getProvider?: () => string | undefined;
 
   constructor() {
     this.debouncer = new CompletionDebouncer(300);
@@ -42,6 +43,10 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     this.getBaseURL = fn;
   }
 
+  setProviderProvider(fn: () => string | undefined): void {
+    this.getProvider = fn;
+  }
+
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
     position: vscode.Position,
@@ -68,9 +73,10 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
 
     const apiKey = this.getApiKey?.();
     if (!apiKey) { logInfo('Completion: no API key'); return []; }
+    const provider = this.getProvider?.() || 'anthropic';
 
     try {
-      const completion = await this.engine.generate(ctx.prefix, ctx.suffix, apiKey, this.getBaseURL?.(), abortController.signal);
+      const completion = await this.engine.generate(ctx.prefix, ctx.suffix, provider, apiKey, this.getBaseURL?.(), abortController.signal);
       if (!completion) { logInfo('Completion: empty response'); return []; }
 
       const processed = this.postProcess(completion, document, position);

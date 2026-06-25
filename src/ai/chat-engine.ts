@@ -5,7 +5,7 @@ import { logInfo, logError } from '../utils/logger';
 import { saveFullHistory } from '../chat/history';
 import { runAgentLoop, type AgentCallbacks } from './agent-loop';
 import type { ApiConfig, ToolDef } from './api-client';
-import type { Message } from './message-types';
+import type { Message, Attachment } from './message-types';
 
 const SYSTEM_PROMPT = `You are an AI coding assistant integrated into VS Code. You help developers write, understand, and debug code.
 
@@ -42,6 +42,7 @@ export class ChatEngine {
   private toolDiffs: Map<string, import('../types/diff').UnifiedDiff> = new Map();
   private readonly baseURL: string;
   private readonly apiKey: string;
+  private readonly provider: string;
 
   constructor(
     private readonly chatModel: LanguageModelV1,
@@ -53,6 +54,7 @@ export class ChatEngine {
   ) {
     this.baseURL = baseURL || '';
     this.apiKey = apiKey || '';
+    this.provider = provider || 'anthropic';
     this.streamBridge = new StreamBridge();
   }
 
@@ -68,6 +70,7 @@ export class ChatEngine {
   async sendMessage(
     userContent: string,
     onApproval?: (toolCallId: string, toolName: string, displayName: string, args: Record<string, unknown>) => Promise<boolean>,
+    attachments?: Attachment[],
   ): Promise<void> {
     this.abortController?.abort();
     this.abortController = new AbortController();
@@ -75,7 +78,7 @@ export class ChatEngine {
     this.lastStreamText = '';
     this.lastToolCalls = [];
     this.lastToolResults = [];
-    this.history.push({ role: 'user', content: userContent });
+    this.history.push({ role: 'user', content: userContent, attachments });
 
     try {
       await this.runLoop(onApproval);
@@ -117,6 +120,7 @@ export class ChatEngine {
       baseURL: this.baseURL,
       model: ((this.chatModel as any).modelId || 'unknown').replace(/\[.*\]$/, ''), // strip thinking budget suffix
       maxTokens: 4096,
+      provider: this.provider,
     };
 
     const cb: AgentCallbacks = {

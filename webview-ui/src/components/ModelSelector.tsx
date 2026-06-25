@@ -57,7 +57,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
     const p = PROVIDERS.find(p => p.id === newProvider);
     onChangeSettings({
       provider: newProvider,
-      baseURL: p?.defaultBaseURL || undefined,
+      baseURL: p?.defaultBaseURL ?? '', // empty string = clear, not undefined (which router ignores)
     });
     setOpen(false);
   };

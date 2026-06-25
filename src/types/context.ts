@@ -4,6 +4,7 @@ export interface ContextSnapshot {
   projectStructure: string;
   diagnostics: DiagnosticInfo[];
   activeSelection?: SelectionInfo;
+  projectRules?: string;
   timestamp: number;
 }
 

@@ -121,6 +121,7 @@ export class MessageRouter implements vscode.Disposable {
         });
         // Parse @file references and read file contents as context
         let content = message.payload.content;
+        const attachments = message.payload.attachments as import('../ai/message-types').Attachment[] | undefined;
         const ws = this.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
         const atRefs = content.match(/@(\S+)/g);
         if (atRefs) {
@@ -165,7 +166,8 @@ export class MessageRouter implements vscode.Disposable {
                   }
                 }, 300000);
               });
-            }
+            },
+            attachments,
           );
         } catch (err: any) {
           if (err.name !== 'AbortError') {

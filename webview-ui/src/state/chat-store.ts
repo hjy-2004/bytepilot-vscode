@@ -52,6 +52,7 @@ interface ChatStore {
     openFiles: string[];
     projectFiles: number;
     diagnosticsCount: number;
+    hasRules: boolean;
   };
 
   addUserMessage: (content: string) => void;
@@ -65,7 +66,7 @@ interface ChatStore {
   clearMessages: () => void;
   setConfig: (config: ConfigState) => void;
   setPermissionRequest: (request: PermissionRequest | null) => void;
-  updateContext: (info: { openFiles: string[]; projectFiles: number; diagnosticsCount: number }) => void;
+  updateContext: (info: { openFiles: string[]; projectFiles: number; diagnosticsCount: number; hasRules?: boolean }) => void;
   addErrorMessage: (content: string) => void;
   restoreMessages: (msgs: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number; toolCalls?: ToolCallEntry[] }>) => void;
 }
@@ -82,7 +83,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   config: null,
   configLoaded: false,
   permissionRequest: null,
-  contextInfo: { openFiles: [], projectFiles: 0, diagnosticsCount: 0 },
+  contextInfo: { openFiles: [], projectFiles: 0, diagnosticsCount: 0, hasRules: false },
 
   addUserMessage: (content: string) => {
     const msg: ChatMessage = {
@@ -170,7 +171,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setPermissionRequest: (request) => set({ permissionRequest: request }),
 
-  updateContext: (info) => set({ contextInfo: info }),
+  updateContext: (info) => set((s) => ({ contextInfo: { ...s.contextInfo, ...info, hasRules: info.hasRules ?? s.contextInfo.hasRules } })),
 
   addErrorMessage: (content) => {
     const msg: ChatMessage = {

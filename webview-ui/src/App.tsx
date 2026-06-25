@@ -78,9 +78,9 @@ const App: React.FC = () => {
 
   useOnExtensionMessage(handleExtensionMessage);
 
-  const handleSend = useCallback((content: string) => {
+  const handleSend = useCallback((content: string, attachments?: Array<{ name: string; content: string; type: 'image'; mimeType: string }>) => {
     useChatStore.getState().addUserMessage(content);
-    postMessage({ type: 'chat.send', payload: { content } } as any);
+    postMessage({ type: 'chat.send', payload: { content, attachments } } as any);
   }, [postMessage]);
 
   const handleCancel = useCallback(() => {

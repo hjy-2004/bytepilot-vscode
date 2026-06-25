@@ -9,7 +9,7 @@ export interface ChatSendMessage {
   type: 'chat.send';
   payload: {
     content: string;
-    attachments?: { name: string; content: string }[];
+    attachments?: { name: string; content: string; type: 'image' | 'file'; mimeType?: string }[];
   };
 }
 
@@ -161,6 +161,7 @@ export interface ContextUpdateMessage {
     openFiles: string[];
     projectFiles: number;
     diagnosticsCount: number;
+    hasRules?: boolean;
   };
 }
 

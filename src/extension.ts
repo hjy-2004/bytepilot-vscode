@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { ChatPanel } from './chat/panel';
 import { DisposableStore } from './utils/disposable';
-import { logInfo, logError, disposeLogger, getLogger } from './utils/logger';
+import { logInfo, logError, disposeLogger, getLogger, showLogger } from './utils/logger';
 import { setDevMode } from './utils/ai-logger';
 import { ProviderManager } from './ai/provider-manager';
 import { SecretsStore } from './ai/secrets-store';
@@ -145,6 +145,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerCommands(context, secretsStore);
 
   logInfo('AI Coding Agent activated successfully.');
+
+  // Show BytePilot output channel by default in debug mode
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    showLogger();
+  }
 }
 
 function createChatEngine(): void {
@@ -190,6 +195,7 @@ function updateCompletionEngine(): void {
     inlineProvider?.setEngine(new CompletionEngine(model));
     inlineProvider?.setApiKeyProvider(() => providerManager.getConfig()?.apiKey);
     inlineProvider?.setBaseURLProvider(() => providerManager.getConfig()?.baseURL);
+    inlineProvider?.setProviderProvider(() => providerManager.getConfig()?.provider);
   } catch (err) {
     logError('Failed to create completion engine', err);
   }
