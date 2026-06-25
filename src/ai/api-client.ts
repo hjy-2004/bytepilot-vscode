@@ -43,25 +43,41 @@ export async function streamChat(
 // ── Anthropic Messages API ──
 
 function toAnthropicMessages(messages: Message[]): unknown[] {
-  return messages.filter((m) => m.role !== 'system').map((m) => {
+  // Filter system messages first
+  const filtered = messages.filter((m) => m.role !== 'system');
+  const result: unknown[] = [];
+
+  for (let i = 0; i < filtered.length; i++) {
+    const m = filtered[i];
+
     if (m.role === 'tool') {
-      const tid = m.toolCallId || 'unknown';
-      return { role: 'user', content: [{ type: 'tool_result', tool_use_id: tid, content: m.content }] };
+      // Merge consecutive tool_result messages into one user message.
+      // Anthropic requires ALL tool_results for a given assistant's tool_uses
+      // to be in a SINGLE user message immediately after the assistant message.
+      const toolResults: unknown[] = [{ type: 'tool_result', tool_use_id: m.toolCallId || 'unknown', content: m.content }];
+      // Collect consecutive tool messages
+      while (i + 1 < filtered.length && filtered[i + 1].role === 'tool') {
+        i++;
+        toolResults.push({ type: 'tool_result', tool_use_id: filtered[i].toolCallId || 'unknown', content: filtered[i].content });
+      }
+      result.push({ role: 'user', content: toolResults });
+      continue;
     }
+
     if (m.role === 'assistant' && m.toolCalls?.length) {
       const content: unknown[] = [];
       if (m.content) content.push({ type: 'text', text: m.content });
       for (const tc of m.toolCalls) {
         content.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.args });
       }
-      return { role: 'assistant', content };
+      result.push({ role: 'assistant', content });
+      continue;
     }
     // User message with image attachments → vision content blocks
     if (m.role === 'user' && m.attachments?.length) {
       const content: unknown[] = [];
       for (const att of m.attachments) {
         if (att.type === 'image' && att.content) {
-          // Extract base64 data (strip data:image/...;base64, prefix)
           const b64 = att.content.replace(/^data:image\/\w+;base64,/, '');
           content.push({
             type: 'image',
@@ -70,10 +86,12 @@ function toAnthropicMessages(messages: Message[]): unknown[] {
         }
       }
       if (m.content) content.push({ type: 'text', text: m.content });
-      return { role: 'user', content };
+      result.push({ role: 'user', content });
+      continue;
     }
-    return { role: m.role, content: m.content };
-  });
+    result.push({ role: m.role, content: m.content });
+  }
+  return result;
 }
 
 async function streamChatAnthropic(
