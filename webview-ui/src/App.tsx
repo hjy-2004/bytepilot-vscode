@@ -32,6 +32,9 @@ const App: React.FC = () => {
   const handleExtensionMessage = useCallback((msg: ExtensionMessage) => {
     const store = useChatStore.getState();
     switch (msg.type) {
+      case 'chat.started':
+        store.setStreaming(true);
+        break;
       case 'chat.token':
         store.appendStreamChunk(msg.payload.text);
         break;

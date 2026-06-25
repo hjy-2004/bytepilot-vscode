@@ -32,9 +32,12 @@ export const searchFilesTool: ToolDef = {
       const uris = await vscode.workspace.findFiles('**/*', exclude, maxResults * 3);
       const results: { file: string; line: number; text: string }[] = [];
       const lower = args.pattern.toLowerCase();
+      const MAX_FILE_SIZE = 256 * 1024; // 256KB per file for content search
       for (const uri of uris) {
         if (results.length >= maxResults) break;
         try {
+          const stat = await vscode.workspace.fs.stat(uri);
+          if (stat.size > MAX_FILE_SIZE) continue; // Skip large files
           const lines = (await vscode.workspace.fs.readFile(uri)).toString().split('\n');
           for (let i = 0; i < lines.length && results.length < maxResults; i++) {
             if (lines[i].toLowerCase().includes(lower)) {

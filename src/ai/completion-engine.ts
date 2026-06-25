@@ -31,10 +31,12 @@ export class CompletionEngine {
       case 'ollama':
         return this.generateOllamaFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
       case 'openai':
-        return this.generateOpenAIFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
-      default:
-        // DeepSeek / Anthropic-compatible FIM
+        return this.generateChatFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
+      case 'deepseek':
         return this.generateDeepSeekFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
+      default:
+        // Anthropic and other providers use chat-based FIM
+        return this.generateChatFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
     }
   }
 
@@ -50,10 +52,16 @@ export class CompletionEngine {
     abortSignal?: AbortSignal,
   ): Promise<string | null> {
     try {
-      const url = (baseURL || 'https://api.deepseek.com')
-        .replace(/\/anthropic\/?$/, '/beta')
-        .replace(/\/v1\/?$/, '/beta')
-        + '/completions';
+      // Build FIM completions URL. Avoid double /beta substitution.
+      let urlBase = baseURL || 'https://api.deepseek.com';
+      if (urlBase.includes('/beta')) {
+        // Already a beta endpoint — use as-is
+      } else if (urlBase.endsWith('/anthropic')) {
+        urlBase = urlBase.replace(/\/anthropic$/, '/beta');
+      } else {
+        urlBase = urlBase.replace(/\/v1\/?$/, '') + '/beta';
+      }
+      const url = urlBase.replace(/\/$/, '') + '/completions';
 
       const response = await fetch(url, {
         method: 'POST',
@@ -143,8 +151,8 @@ export class CompletionEngine {
     }
   }
 
-  /** OpenAI chat-based fill: POST /chat/completions (no native FIM endpoint) */
-  private async generateOpenAIFIM(
+  /** Chat-based fill: POST /chat/completions (for Anthropic, OpenAI, and providers without native FIM) */
+  private async generateChatFIM(
     modelId: string,
     prefix: string,
     suffix: string,
@@ -184,18 +192,18 @@ export class CompletionEngine {
 
       if (!response.ok) {
         const text = await response.text();
-        logInfo(`FIM error (OpenAI): ${response.status} ${text.substring(0, 200)}`);
+        logInfo(`FIM error (Chat): ${response.status} ${text.substring(0, 200)}`);
         return null;
       }
 
       const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
       const text = data.choices?.[0]?.message?.content?.trim() || '';
       if (!text) return null;
-      logInfo(`FIM response (OpenAI): ${text.length} chars`);
+      logInfo(`FIM response (Chat): ${text.length} chars`);
       return text;
     } catch (err: any) {
       if (err.name === 'AbortError') return null;
-      logInfo(`FIM error (OpenAI): ${err.message}`);
+      logInfo(`FIM error (Chat): ${err.message}`);
       return null;
     }
   }

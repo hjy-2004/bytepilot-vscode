@@ -5,6 +5,7 @@ import { logInfo, logError } from '../utils/logger';
 import { logAiRequestStart, logAiCompletion, logAiError, logToolCallStart, logToolCallResult } from '../utils/ai-logger';
 
 export interface AgentCallbacks {
+  onStarted: () => void;
   onToken: (text: string) => void;
   onToolCall: (id: string, name: string, displayName: string, args: Record<string, unknown>, needsApproval?: boolean) => void;
   onApprovalNeeded: (id: string, name: string, displayName: string, args: Record<string, unknown>) => Promise<boolean>;
@@ -25,6 +26,9 @@ export async function runAgentLoop(
 ): Promise<void> {
   const startTime = Date.now();
   const sm: Message = { role: 'system', content: systemPrompt };
+
+  // Notify UI immediately that processing has started
+  cb.onStarted();
 
   logAiRequestStart({
     provider: config.provider || 'anthropic',

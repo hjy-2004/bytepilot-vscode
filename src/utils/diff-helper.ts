@@ -1,7 +1,7 @@
 import { structuredPatch, type ParsedDiff } from 'diff';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import type { UnifiedDiff, DiffLine, DiffHunk } from '../types/diff';
 
 /**
@@ -34,27 +34,37 @@ export function computeDiffFromPaths(
 
 /**
  * Compute a UnifiedDiff between the working tree file and its git HEAD version.
+ * Uses async exec to avoid blocking the extension host.
  */
-export function computeDiffFromGit(
+export async function computeDiffFromGit(
   filePath: string,
   workspaceRoot: string,
-): UnifiedDiff {
+): Promise<UnifiedDiff> {
   const fullPath = path.resolve(workspaceRoot, filePath);
   const newContent = fs.readFileSync(fullPath, 'utf-8');
 
+  // Normalize path for git (always use forward slashes relative to repo root)
+  const gitPath = filePath.replace(/\\/g, '/');
+  // Reject paths with shell metacharacters to prevent command injection
+  if (/[$`;"|&(){}[\]<>!*?\\~']/.test(gitPath)) {
+    return computeDiffFromContent(filePath, '', newContent);
+  }
+
   let oldContent: string;
   try {
-    // Normalize path for git (always use forward slashes relative to repo root)
-    const gitPath = filePath.replace(/\\/g, '/');
-    // Reject paths with shell metacharacters to prevent command injection
-    if (/[$`;"|&(){}[\]<>!*?\\~']/.test(gitPath)) {
-      throw new Error('File path contains unsafe characters for git operation.');
-    }
-    oldContent = execSync(`git show HEAD:"${gitPath}"`, {
-      cwd: workspaceRoot,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-      stdio: ['pipe', 'pipe', 'pipe'],
+    oldContent = await new Promise<string>((resolve, reject) => {
+      exec(`git show HEAD:"${gitPath}"`, {
+        cwd: workspaceRoot,
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 10000,
+      }, (error, stdout, stderr) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(stdout);
+        }
+      });
     });
   } catch {
     // File not in git (new file) — treat as empty old content

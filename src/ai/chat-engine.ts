@@ -4,6 +4,7 @@ import { StreamBridge } from './stream-bridge';
 import { logInfo, logError } from '../utils/logger';
 import { saveFullHistory } from '../chat/history';
 import { runAgentLoop, type AgentCallbacks } from './agent-loop';
+import { estimateTokens, trimContextToBudget } from '../utils/token-counter';
 import * as vscode from 'vscode';
 import type { ApiConfig, ToolDef } from './api-client';
 import type { Message, Attachment } from './message-types';
@@ -105,6 +106,10 @@ export class ChatEngine {
         this.streamBridge.sendError(err.message || 'An unknown error occurred.');
       }
       throw err;
+    } finally {
+      this.isGenerating = false;
+      this.abortController = null;
+      this.streamBridge.sendDone();
     }
   }
 
@@ -113,7 +118,20 @@ export class ChatEngine {
     const toolDescs = this.toolRegistry.getSystemPromptTools();
     const base = SYSTEM_PROMPT.replace('__TOOLS_PLACEHOLDER__', toolDescs);
     const sysInfo = `\n\n## System Info\n- OS: ${process.platform} (${process.platform === 'win32' ? 'use cmd /c, del, rmdir; not rm, rm -rf, mkdir' : 'use standard Unix commands'})`;
-    const systemPrompt = sysCtx ? `${base}${sysInfo}\n\n## Current Workspace Context\n${sysCtx}` : `${base}${sysInfo}`;
+    let contextPart = '';
+    if (sysCtx) {
+      const contextLimit = vscode.workspace.getConfiguration('aiCodingAgent').get<number>('contextLength') ?? 128000;
+      // Reserve ~70% of context for conversation; allow ~30% for system + context
+      const maxCtxTokens = Math.floor(contextLimit * 0.3);
+      const { trimmed, estimatedTokens, wasTrimmed } = trimContextToBudget(sysCtx, maxCtxTokens);
+      contextPart = `\n\n## Current Workspace Context\n${trimmed}`;
+      if (wasTrimmed) {
+        logInfo(`[ChatEngine] Context trimmed: ~${estimatedTokens} tokens (budget: ${maxCtxTokens})`);
+      }
+    }
+    const systemPrompt = `${base}${sysInfo}${contextPart}`;
+    const estimatedSysTokens = estimateTokens(systemPrompt, false);
+    logInfo(`[ChatEngine] System prompt: ~${estimatedSysTokens} tokens`);
 
     const tools = this.toolRegistry.list();
     const toolDefs: ToolDef[] = tools.map((t) => {
@@ -135,10 +153,12 @@ export class ChatEngine {
       baseURL: this.baseURL,
       model: ((this.chatModel as any).modelId || 'unknown').replace(/\[.*\]$/, ''), // strip thinking budget suffix
       maxTokens: vscode.workspace.getConfiguration('aiCodingAgent').get<number>('maxTokens') ?? 4096,
+      thinkingBudget: vscode.workspace.getConfiguration('aiCodingAgent').get<number>('thinkingBudget') ?? 4096,
       provider: this.provider,
     };
 
     const cb: AgentCallbacks = {
+      onStarted: () => { this.streamBridge.sendStarted(); },
       onToken: (text) => { this.lastStreamText += text; this.streamBridge.sendToken(text); },
       onToolCall: (id, name, dn, args, needsApproval) => {
         this.lastToolCalls.push({ id, name, displayName: dn, args });
@@ -170,8 +190,6 @@ export class ChatEngine {
       saveFullHistory(this.workspacePath, this.getSessionId(), this.history as any, this.toolDiffs);
       this.toolDiffs.clear();
     }
-    this.isGenerating = false;
-    this.streamBridge.sendDone();
   }
 
   clearHistory(): void { this.history = []; }

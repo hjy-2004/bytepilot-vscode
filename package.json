@@ -137,6 +137,13 @@
           "maximum": 32000,
           "description": "Maximum tokens per response."
         },
+        "aiCodingAgent.thinkingBudget": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 0,
+          "maximum": 32000,
+          "description": "Budget for Anthropic extended thinking (0 = disabled). Set to 0 to disable thinking for faster/cheaper responses. Requires a Claude model that supports extended thinking."
+        },
         "aiCodingAgent.completionsEnabled": {
           "type": "boolean",
           "default": true,

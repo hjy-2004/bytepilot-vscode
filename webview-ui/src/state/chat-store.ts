@@ -92,7 +92,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       content,
       timestamp: Date.now(),
     };
-    set((s) => ({ messages: [...s.messages, msg], streamingText: '' }));
+    set((s) => ({ messages: [...s.messages, msg], streamingText: '', isStreaming: true }));
   },
 
   appendStreamChunk: (text: string) => {

@@ -3,9 +3,23 @@ import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import type { ToolDef } from '../types/tools';
 
+// Block destructive file operations, force push to protected branches, and obfuscated payloads.
+// This is a defense-in-depth measure on top of the tool approval flow.
 const DANGEROUS = [
-  /rm\s+-rf\s+\//, /git\s+push\s+--force\s+.*(main|master)/,
-  /sudo\s+rm/, /:\s*\{\s*:\|:&\s*};?:/,
+  // Recursive deletion from root
+  /\brm\s+.*-r.*\s+\//, /\brm\s+.*-r.*\s+\/etc\b/, /\brm\s+.*-r.*\s+\/home\b/,
+  /\brmdir\s+\//, /\bdel\s+\/[a-z]/, /\bdeltree\s+\//,
+  // Force push to main/master/protected branches
+  /\bgit\s+push\s+.*--force.*\s+(main|master|release|prod)/,
+  /\bgit\s+push\s+.*-f\s+(main|master|release|prod)/,
+  // Fork bombs and shell injection patterns
+  /:\s*\{\s*:\|:&\s*};\s*:?/, /\$\(\s*echo\s+.*\|\s*base64\s+-d\s*\)/,
+  // Curl/wget piped to shell execution
+  /\bcurl\s+.*\|\s*(ba)?sh\b/, /\bwget\s+.*-O\s*-\s*.*\|\s*(ba)?sh\b/,
+  // chmod opening up everything
+  /\bchmod\s+.*777\s+\//, /\bchmod\s+.*-R\s+777\s+\//,
+  // Disk formatting / destructive system commands
+  /\bmkfs\./, /\bdd\s+if=.*of=\/dev\//, /\b>\/dev\/sd/,
 ];
 
 export const executeCommandTool: ToolDef = {

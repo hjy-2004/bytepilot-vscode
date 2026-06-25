@@ -38,8 +38,12 @@ let contextCollector: ContextCollector;
 let inlineProvider: InlineCompletionProvider;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  logInfo('AI Coding Agent activating...');
   setDevMode(context.extensionMode === vscode.ExtensionMode.Development);
+  logInfo('AI Coding Agent activating...');
+  // Show output channel immediately in debug mode so user sees startup logs
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    showLogger();
+  }
   disposables = new DisposableStore();
 
   // --- Context Collector ---
@@ -145,11 +149,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerCommands(context, secretsStore);
 
   logInfo('AI Coding Agent activated successfully.');
-
-  // Show BytePilot output channel by default in debug mode
-  if (context.extensionMode === vscode.ExtensionMode.Development) {
-    showLogger();
-  }
 }
 
 function createChatEngine(): void {
@@ -372,7 +371,7 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
         `Base URL: ${config?.baseURL || 'N/A'}`,
         `Temperature: ${config?.options?.temperature ?? 'N/A'}`,
         `Max Tokens: ${config?.options?.maxTokens ?? 'N/A'}`,
-        `API Key set: ${apiKey ? 'YES (' + apiKey.substring(0, 8) + '...)' : 'NO'}`,
+        `API Key set: ${apiKey ? 'YES' : 'NO'}`,
         `Claude config found: ${claudeExists ? 'YES (' + claudePath + ')' : 'NO'}`,
         ``,
         `Workspace: ${vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'N/A'}`,

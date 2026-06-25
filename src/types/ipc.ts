@@ -97,6 +97,11 @@ export type WebViewMessage =
 
 // ---- Extension Host -> WebView ----
 
+export interface ChatStartedMessage {
+  type: 'chat.started';
+  payload: Record<string, never>;
+}
+
 export interface ChatTokenMessage {
   type: 'chat.token';
   payload: { text: string };
@@ -236,6 +241,7 @@ export interface FilesSearchResultMessage {
 }
 
 export type ExtensionMessage =
+  | ChatStartedMessage
   | ChatTokenMessage
   | ChatToolCallMessage
   | ChatToolResultMessage

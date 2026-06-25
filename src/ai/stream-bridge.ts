@@ -12,6 +12,14 @@ export class StreamBridge {
     this.callback = callback;
   }
 
+  sendStarted(): void {
+    if (this.cancelled) return;
+    this.callback?.({
+      type: 'chat.started',
+      payload: {} as Record<string, never>,
+    });
+  }
+
   sendToken(text: string): void {
     if (this.cancelled) return;
     this.callback?.({

@@ -2,11 +2,11 @@ import * as vscode from 'vscode';
 
 /**
  * Debounces inline completion requests to avoid excessive API calls.
- * Only fires when the user has stopped typing for `delay` milliseconds.
+ * Tracks state per-document so switching files doesn't incorrectly debounce.
  */
 export class CompletionDebouncer implements vscode.Disposable {
-  private timer: NodeJS.Timeout | null = null;
-  private lastRequestTime = 0;
+  private timers = new Map<string, NodeJS.Timeout>();
+  private lastRequestByDoc = new Map<string, number>();
   private delay: number;
   private disposables: vscode.Disposable[] = [];
 
@@ -17,34 +17,37 @@ export class CompletionDebouncer implements vscode.Disposable {
   /**
    * Returns true if the request should be skipped (debounced).
    * Returns false if the request should proceed.
+   * State is tracked per-document to avoid cross-file interference.
    */
   shouldDebounce(document: vscode.TextDocument, position: vscode.Position): boolean {
+    const key = document.uri.toString();
     const now = Date.now();
-    if (now - this.lastRequestTime < this.delay) {
+    const last = this.lastRequestByDoc.get(key) || 0;
+    if (now - last < this.delay) {
       return true;
     }
-    this.lastRequestTime = now;
+    this.lastRequestByDoc.set(key, now);
     return false;
   }
 
-  /** Reset the debounce timer */
+  /** Reset the debounce timer for all documents */
   reset(): void {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer);
     }
-    this.lastRequestTime = 0;
+    this.timers.clear();
+    this.lastRequestByDoc.clear();
   }
 
   /** Wait for the debounce period to elapse */
   async wait(): Promise<void> {
     this.reset();
     return new Promise((resolve) => {
-      this.timer = setTimeout(() => {
-        this.timer = null;
-        this.lastRequestTime = Date.now();
+      const timer = setTimeout(() => {
+        this.timers.delete('global');
         resolve();
       }, this.delay);
+      this.timers.set('global', timer);
     });
   }
 

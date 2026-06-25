@@ -47,7 +47,7 @@ export const diffFileTool: ToolDef = {
         ctx.onDiff?.(diff);
         return `Diff: ${diff.stats.additions} additions, ${diff.stats.deletions} deletions across ${diff.hunks.length} hunks.`;
       } else {
-        const diff = computeDiffFromGit(args.filePath as string, ctx.workspaceRoot);
+        const diff = await computeDiffFromGit(args.filePath as string, ctx.workspaceRoot);
         ctx.onDiff?.(diff);
         if (diff.stats.additions === 0 && diff.stats.deletions === 0) {
           return `No changes in "${args.filePath}" compared to HEAD.`;

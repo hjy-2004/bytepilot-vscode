@@ -18,15 +18,24 @@ export const readDiagnosticsTool: ToolDef = {
   },
   async call(args, ctx) {
     try {
-      const openUris = new Set(
-        vscode.window.tabGroups.all.flatMap(g => g.tabs).map(t => (t.input as any)?.uri?.fsPath).filter(Boolean) as string[]
-      );
       const all = vscode.languages.getDiagnostics();
-      const relevant = all.filter(([uri, diags]) => {
-        if (diags.length === 0) return false;
-        if (args.filePath) return uri.fsPath.includes(args.filePath);
-        return openUris.has(uri.fsPath);
-      });
+      let relevant: [vscode.Uri, readonly vscode.Diagnostic[]][];
+      if (args.filePath) {
+        // When a filePath is specified, search ALL diagnostics for matching files
+        relevant = all.filter(([uri, diags]) => {
+          if (diags.length === 0) return false;
+          return uri.fsPath.includes(args.filePath as string);
+        });
+      } else {
+        // No filePath: check diagnostics for all open tabs
+        const openUris = new Set(
+          vscode.window.tabGroups.all.flatMap(g => g.tabs).map(t => (t.input as any)?.uri?.fsPath).filter(Boolean) as string[]
+        );
+        relevant = all.filter(([uri, diags]) => {
+          if (diags.length === 0) return false;
+          return openUris.has(uri.fsPath);
+        });
+      }
       if (relevant.length === 0) return 'No diagnostics found.';
       const lines: string[] = [];
       for (const [uri, diags] of relevant) {

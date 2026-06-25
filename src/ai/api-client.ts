@@ -1,10 +1,34 @@
 import type { Message, ToolCall } from './message-types';
 
+// ── Retry helpers ──
+
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+const MAX_RETRIES = 3;
+const BASE_DELAY = 1000; // 1s initial backoff
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retries = MAX_RETRIES,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url, init);
+    if (res.ok || !RETRYABLE_STATUSES.has(res.status) || attempt === retries) {
+      return res;
+    }
+    const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 500;
+    await new Promise(r => setTimeout(r, delay));
+  }
+  // Should not reach here, but just in case
+  return fetch(url, init);
+}
+
 export interface ApiConfig {
   apiKey: string;
   baseURL: string;
   model: string;
   maxTokens?: number;
+  thinkingBudget?: number; // budget_tokens for Anthropic extended thinking (0 = disabled)
   provider?: string; // 'anthropic' | 'openai' | 'ollama'
 }
 
@@ -104,21 +128,34 @@ async function streamChatAnthropic(
 ): Promise<StreamResult> {
   const url = `${config.baseURL || 'https://api.anthropic.com'}/v1/messages`;
   const systemMsg = messages.find((m) => m.role === 'system');
+  const thinkingBudget = config.thinkingBudget ?? 0;
   const body: Record<string, unknown> = {
     model: config.model,
     max_tokens: config.maxTokens ?? 4096,
     messages: toAnthropicMessages(messages),
     stream: true,
-    thinking: { type: 'disabled' },
   };
-  if (systemMsg) body['system'] = [{ type: 'text', text: systemMsg.content }];
+  if (thinkingBudget > 0) {
+    body['thinking'] = { type: 'enabled', budget_tokens: Math.min(thinkingBudget, (config.maxTokens ?? 4096) - 1024) };
+  }
+  if (systemMsg) {
+    body['system'] = [
+      { type: 'text', text: systemMsg.content, cache_control: { type: 'ephemeral' } },
+    ];
+  }
   if (tools.length > 0) {
-    body['tools'] = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
+    body['tools'] = tools.map((t, i) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.parameters,
+      // Cache all but the last tool definition to maximize cache reuse
+      ...(i < tools.length - 1 ? { cache_control: { type: 'ephemeral' } } : {}),
+    }));
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': '2023-06-01' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'prompt-caching-2024-07-31' },
     body: JSON.stringify(body), signal,
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${(await res.text().catch(() => '')).slice(0, 500)}`);
@@ -143,6 +180,9 @@ async function streamChatAnthropic(
         if (!t.startsWith('data: ')) continue;
         try {
           const j = JSON.parse(t.slice(6));
+          // Handle thinking blocks (skip — they're internal reasoning, not visible text)
+          if (j.type === 'content_block_start' && (j.content_block?.type === 'thinking' || j.content_block?.type === 'redacted_thinking')) continue;
+          if (j.type === 'content_block_delta' && (j.delta?.type === 'thinking_delta' || j.delta?.type === 'signature_delta')) continue;
           if (j.type === 'content_block_delta' && j.delta?.type === 'text_delta') {
             text += j.delta.text;
             onToken(j.delta.text);
@@ -154,6 +194,11 @@ async function streamChatAnthropic(
           }
           if (j.type === 'content_block_start' && j.content_block?.type === 'tool_use') {
             bmap.set(j.index as number, { id: j.content_block.id, name: j.content_block.name, args: '' });
+          }
+          // Handle per-block stop reasons (content_block_stop events)
+          if (j.type === 'content_block_stop' && bmap.has(j.index as number)) {
+            const b = bmap.get(j.index)!;
+            if (!b.id && !b.name) bmap.delete(j.index);
           }
           if (j.type === 'message_delta') {
             if (j.usage) {
@@ -202,7 +247,7 @@ async function streamChatOpenAI(
   let text = '';
   const calls: ToolCall[] = [];
   let usage: { inputTokens: number; outputTokens: number } | undefined;
-
+  let stopReason: string | undefined;
   // Build OpenAI-format messages with proper tool call history
   for (const m of messages) {
     if (m.role === 'system') {
@@ -252,7 +297,7 @@ async function streamChatOpenAI(
     body['tools'] = toOpenAITools(tools);
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
     body: JSON.stringify(body), signal,
@@ -348,7 +393,7 @@ async function streamChatOllama(
   let text = '';
   const calls: ToolCall[] = [];
   let usage: { inputTokens: number; outputTokens: number } | undefined;
-
+  let stopReason: string | undefined;
   const ollamaMessages = messages.map((m) => {
     const entry: Record<string, unknown> = { role: m.role === 'tool' ? 'user' : m.role, content: m.content };
     if (m.role === 'assistant' && m.toolCalls?.length) {
@@ -383,7 +428,7 @@ async function streamChatOllama(
     headers['Authorization'] = `Bearer ${config.apiKey}`;
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(body), signal,
