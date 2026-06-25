@@ -94,9 +94,8 @@ export async function runAgentLoop(
         if (!approved) {
           history.push({ role: 'tool', toolCallId: tc.id, content: 'Error: Tool execution was rejected by user.' });
           cb.onToolResult(tc.id, tc.name, 'Error: Tool execution was rejected by user.', false);
-          cb.onToken(`\n\n⏹️ **Stopped**: Tool was rejected by user.\n\n`);
-          logInfo(`[AgentLoop] Stopped — user rejected ${tc.name}`);
-          return;
+          logInfo(`[AgentLoop] User rejected ${tc.name} — injecting denial as tool_result`);
+          continue;
         }
 
         const t0 = Date.now();

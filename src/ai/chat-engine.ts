@@ -22,7 +22,8 @@ __TOOLS_PLACEHOLDER__
 - Use workspace-relative paths (e.g., "src/index.ts").
 - Keep responses concise; show code over explanation.
 - When you see errors, check diagnostics first.
-- Follow the project's existing code style.`;
+- Follow the project's existing code style.
+- **If the user denies a tool you call, do not re-attempt the exact same tool call. Instead, think about why the user has denied the tool call and adjust your approach.**`;
 
 /**
  * Core chat engine that manages AI conversations with tool calling.
