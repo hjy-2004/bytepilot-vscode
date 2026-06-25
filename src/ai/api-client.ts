@@ -12,6 +12,7 @@ export interface StreamResult {
   text: string;
   toolCalls: ToolCall[];
   usage?: { inputTokens: number; outputTokens: number };
+  stopReason?: string; // 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
 }
 
 export interface ToolDef {
@@ -129,6 +130,7 @@ async function streamChatAnthropic(
   const bmap = new Map<number, { id: string; name: string; args: string }>();
   const calls: ToolCall[] = [];
   let usage: { inputTokens: number; outputTokens: number } | undefined;
+  let stopReason: string | undefined;
 
   try {
     while (true) {
@@ -153,8 +155,13 @@ async function streamChatAnthropic(
           if (j.type === 'content_block_start' && j.content_block?.type === 'tool_use') {
             bmap.set(j.index as number, { id: j.content_block.id, name: j.content_block.name, args: '' });
           }
-          if (j.type === 'message_delta' && j.usage) {
-            usage = { inputTokens: j.usage.input_tokens || 0, outputTokens: j.usage.output_tokens || 0 };
+          if (j.type === 'message_delta') {
+            if (j.usage) {
+              usage = { inputTokens: j.usage.input_tokens || 0, outputTokens: j.usage.output_tokens || 0 };
+            }
+            if (j.delta?.stop_reason) {
+              stopReason = j.delta.stop_reason;
+            }
           }
         } catch {}
       }
@@ -167,7 +174,7 @@ async function streamChatAnthropic(
       catch { calls.push({ id: b.id, name: b.name, args: {} }); }
     }
   }
-  return { text, toolCalls: calls, usage };
+  return { text, toolCalls: calls, usage, stopReason };
 }
 
 // ── OpenAI Chat Completions API ──
@@ -299,6 +306,10 @@ async function streamChatOpenAI(
           if (j.usage) {
             usage = { inputTokens: j.usage.prompt_tokens || 0, outputTokens: j.usage.completion_tokens || 0 };
           }
+          // Stop reason
+          if (choice.finish_reason) {
+            stopReason = choice.finish_reason;
+          }
         } catch {}
       }
     }
@@ -310,7 +321,7 @@ async function streamChatOpenAI(
       catch { calls.push({ id: b.id, name: b.name, args: {} }); }
     }
   }
-  return { text, toolCalls: calls, usage };
+  return { text, toolCalls: calls, usage, stopReason };
 }
 
 // ── Ollama API ──
@@ -410,17 +421,18 @@ async function streamChatOllama(
               });
             }
           }
-          // Usage on done
+          // Done / stop reason
           if (j.done) {
             usage = {
               inputTokens: j.prompt_eval_count || 0,
               outputTokens: j.eval_count || 0,
             };
+            stopReason = j.done_reason || 'stop';
           }
         } catch {}
       }
     }
   } finally { reader.releaseLock(); }
 
-  return { text, toolCalls: calls, usage };
+  return { text, toolCalls: calls, usage, stopReason };
 }

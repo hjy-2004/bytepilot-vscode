@@ -56,20 +56,23 @@ export async function runAgentLoop(
       if (result.toolCalls.length > 0) am.toolCalls = result.toolCalls;
       history.push(am);
 
-      // Don't stop immediately — model may interleave text-only and tool-using responses
-      if (result.toolCalls.length === 0) {
+      // Use API's stop_reason to decide whether to continue (CC pattern)
+      if (result.stopReason === 'end_turn' || result.stopReason === 'stop') {
+        logInfo(`[AgentLoop] Done — stop_reason=${result.stopReason}`);
+        break;
+      }
+      if (result.toolCalls.length === 0 && !result.stopReason) {
+        // No stop_reason provided (older API / provider incompatibility):
+        // fall back to heuristic
         const hasHadTools = history.some(m => m.toolCalls && m.toolCalls.length > 0);
         if (hasHadTools && result.text.length < 500) {
-          // Short text after tools → final message, stop
           logInfo(`[AgentLoop] Done — final text (${result.text.length} chars) after tools`);
           break;
         }
         if (!hasHadTools) {
-          // No tools ever → simple text conversation, stop
           logInfo(`[AgentLoop] Done — no tools, just text response`);
           break;
         }
-        // Has tools before AND long text → model might still be working, continue
         logInfo(`[AgentLoop] Text-only step (${result.text.length} chars) — continuing loop`);
       }
 
