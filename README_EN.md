@@ -11,11 +11,13 @@ Cursor-like AI coding assistant running entirely in VS Code. Multi-provider supp
 - **Visual Diff & Approval** — Inline diff preview with Approve/Reject before every file edit, no modal popups
 - **File Editing** — Precise `old_string → new_string` replacement (Claude Code style)
 - **Tool System** — 8 built-in tools: read / write / edit / search / list / command / diagnostics / diff
+- **Multi-Provider** — Full Anthropic / OpenAI / DeepSeek / Ollama support with automatic format routing
+- **Image Paste & Upload** — Paste images from clipboard or click to upload from disk, vision model support
+- **Project Rules** — Place `.bytepilotrules` in workspace root, auto-injected into AI system prompt
 - **Auto Config** — Reads `.claude/settings.json` on first launch, zero setup
 - **Multi-Session** — JSONL persistence with create/switch/delete, tool calls & diffs fully restored
-- **Multi-Provider** — Anthropic / OpenAI / DeepSeek / Ollama, auto-detected and routed
 - **Model Settings** — Click model badge to switch Provider / Model / Base URL / API Key
-- **Structured Logging** — BytePilot output channel logs AI requests, tool calls, API parameters
+- **Structured Logging** — Unified BytePilot output channel, auto-opens in debug mode
 - **@file References** — Type `@filename` to search workspace files, content auto-attached as context
 
 ## Quick Start
@@ -68,6 +70,19 @@ npx vsce package
 | `aiCodingAgent.completionTemperature` | `0.0` | Completion determinism |
 | `aiCodingAgent.completionMaxTokens` | `256` | Completion limit |
 
+## Project Rules (.bytepilotrules)
+
+Create a `.bytepilotrules` file in your workspace root. Its content is injected into the AI system prompt on every request. Example:
+
+```
+- All functions must have JSDoc comments
+- Use single quotes, not double quotes
+- Indent with 2 spaces
+- Use PascalCase for component files
+```
+
+A "Rules active" badge appears in the chat header when rules are loaded.
+
 ## Commands
 
 | Command | Description |
@@ -92,8 +107,8 @@ extension_plugin/
 │   ├── ai/                 # AI core (agent-loop, api-client, chat-engine, stream-bridge)
 │   ├── tools/              # 8 tools (incl. diff_file)
 │   ├── chat/               # Panel, router, JSONL persistence
-│   ├── context/            # Context collectors
-│   ├── completion/         # InlineCompletionItemProvider
+│   ├── context/            # Context collectors (incl. .bytepilotrules)
+│   ├── completion/         # InlineCompletionItemProvider (multi-provider FIM)
 │   ├── config/             # Settings, importer
 │   └── utils/              # ai-logger, diff-helper
 ├── webview-ui/             # React UI (Vite + Zustand)
@@ -105,24 +120,24 @@ extension_plugin/
 | Layer | Technology |
 |-------|------------|
 | Extension | TypeScript + VS Code API |
-| AI Engine | Custom Anthropic Messages API client (`/anthropic/v1/messages`, SSE streaming) |
+| AI Engine | Multi-provider client (Anthropic Messages / OpenAI Chat / Ollama native, SSE streaming) |
 | Agent Loop | Manual control, AI-driven stop, 500-step safety cap |
 | Tool Approval | Inline diff + Approve/Reject, supports edit_file/write_file preview |
-| Completion | DeepSeek FIM Beta (`/beta/completions`) |
+| Completion | DeepSeek FIM Beta + Ollama / OpenAI chat-based FIM |
 | UI | React 18 + Zustand + react-markdown |
 | Diff | `diff` npm library (unified diff + line numbers + collapse) |
-| Logging | BytePilot output channel (AI requests / tool calls / API params) |
+| Logging | Unified BytePilot output channel (AI requests / tool calls / API params) |
 | Build | esbuild + Vite, `npm run build` compiles both |
-| Storage | JSONL (`~/.ai-coding-agent/projects/`)
+| Storage | JSONL (`~/.ai-coding-agent/projects/`) |
 
 ## Supported Providers
 
 | Provider | Chat | Completion | Tools | Notes |
 |----------|------|------------|-------|-------|
 | DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | Anthropic-compatible endpoint |
-| Anthropic | ✅ | ⚠️ Extend | ✅ | Native Anthropic API |
-| OpenAI | ⚠️ Needs adapter | ⚠️ Extend | ⚠️ Needs adapter | Extend api-client for OpenAI format |
-| Ollama | ⚠️ Needs adapter | ⚠️ Extend | ⚠️ Needs adapter | Same as above |
+| Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | Native Anthropic API |
+| OpenAI (GPT) | ✅ | ✅ (chat FIM) | ✅ | Native OpenAI API |
+| Ollama | ✅ | ✅ (FIM) | ✅ | Local LLM, `/api/chat` native format |
 
 ## License
 

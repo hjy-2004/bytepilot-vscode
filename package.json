@@ -2,7 +2,7 @@
   "name": "bytepilot",
   "displayName": "BytePilot",
   "description": "Cursor-like AI coding assistant for VS Code",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "bytepilot",
   "repository": "https://github.com/hjy-2004/bytepilot-vscode",
   "engines": {
