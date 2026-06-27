@@ -7,17 +7,22 @@
 ## 功能
 
 - **Chat** — 侧边栏 AI 对话，流式响应，AI 自主决定何时停止
-- **Inline Completion** — 输入停顿自动触发灰色补全，Tab 接受
+- **Inline Completion** — 输入停顿自动触发灰色补全，Tab 接受（延迟调度，不再丢弃请求）
 - **Visual Diff & Approval** — 文件编辑前显示可视化 diff，内联审批（Approve/Reject），不再弹窗
 - **File Editing** — 精准 `old_string → new_string` 替换，不重写整个文件
 - **Tool System** — 8 个内置工具：read / write / edit / search / list / command / diagnostics / diff
-- **Multi-Provider** — 完整支持 Anthropic / OpenAI / DeepSeek / Ollama，自动格式路由
+- **Multi-Provider** — 完整支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama，自动格式路由
+- **Slash Commands `/`** — 输入 `/` 弹出命令菜单（`/clear` `/config` `/sessions` `/rules` `/help`）
+- **Input History** — 聊天输入框按 `↑`/`↓` 键浏览历史消息（最多 50 条）
 - **Image Paste & Upload** — 聊天输入框粘贴图片或点击按钮本地上传，支持视觉模型识图
+- **Semantic Search** — BM25 代码搜索引擎，`search_files` 支持 `semantic: true` 相关性排序
 - **Project Rules** — 工作区根目录放置 `.bytepilotrules` 文件，自动注入 AI system prompt
 - **Auto Config** — 首次启动自动读取 `.claude/settings.json`，零配置
 - **Multi-Session** — JSONL 持久化，创建/切换/删除会话，工具调用和 diff 数据完整恢复
+- **Incremental Saving** — 每条工具结果即时写入磁盘，崩溃不丢数据
 - **Model Settings** — 点击标题栏模型标签，可视化切换 Provider / Model / Base URL / API Key
-- **Structured Logging** — 统一 BytePilot 输出频道，记录 AI 请求参数、工具调用、API 详情
+- **Silent Command** — 命令静默执行，不再弹终端窗口
+- **Structured Logging** — 统一 BytePilot 输出频道，记录 AI 请求/工具调用/API 详情/会话诊断
 - **@file References** — 输入 `@文件名` 自动搜索工作区文件，选中后附带文件内容作为上下文
 
 ## 快速开始
@@ -57,12 +62,13 @@ npx vsce package
 
 | 设置 | 默认 | 说明 |
 |------|------|------|
-| `aiCodingAgent.provider` | `anthropic` | 厂商 |
+| `aiCodingAgent.provider` | `anthropic` | 厂商（anthropic/openai/deepseek/google/azure-openai/ollama） |
 | `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | 对话模型 |
 | `aiCodingAgent.completionModel` | (空) | 补全模型（空=同对话） |
 | `aiCodingAgent.baseURL` | (空) | 自定义 API 地址 |
 | `aiCodingAgent.temperature` | `0.7` | 创造性 |
 | `aiCodingAgent.maxTokens` | `4096` | 响应上限 |
+| `aiCodingAgent.thinkingBudget` | `4096` | 扩展思考预算（0=关闭） |
 | `aiCodingAgent.maxAgentSteps` | `500` | Agent 循环安全上限 |
 | `aiCodingAgent.toolApprovalLevel` | `writeOnly` | 审批级别: always / writeOnly / never |
 | `aiCodingAgent.completionsEnabled` | `true` | 启用补全 |
@@ -102,16 +108,18 @@ npx vsce package
 
 ```
 extension_plugin/
+├── .github/workflows/      # CI/CD (lint, build, test, release)
 ├── src/                    # 扩展宿主 (TypeScript)
 │   ├── extension.ts        # 入口
 │   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, stream-bridge）
-│   ├── tools/              # 8 个工具（含 diff_file）
-│   ├── chat/               # 聊天面板、路由、JSONL 历史持久化
-│   ├── context/            # 上下文收集器（含 .bytepilotrules）
-│   ├── completion/         # InlineCompletionItemProvider (多 provider FIM)
-│   ├── config/             # 设置、校验、导入
-│   └── utils/              # ai-logger, diff-helper
-├── webview-ui/             # React 聊天界面 (Vite + Zustand)
+│   ├── tools/              # 8 个工具（含 diff_file, execute_command 静默模式）
+│   ├── chat/               # 聊天面板、路由、JSONL 历史持久化（增量保存 + SHA-256）
+│   ├── context/            # 上下文收集器（.bytepilotrules + BM25 语义搜索）
+│   ├── completion/         # InlineCompletionItemProvider (多 provider FIM, 延迟调度)
+│   ├── config/             # 设置、校验、导入（6 厂商）
+│   └── utils/              # ai-logger, diff-helper, token-counter
+├── webview-ui/             # React 聊天界面 (Vite + Zustand, / 命令 + 输入历史)
+├── eslint.config.mjs       # ESLint flat config
 └── esbuild.config.mjs      # 扩展构建
 ```
 
@@ -134,9 +142,11 @@ extension_plugin/
 
 | 厂商 | 对话 | 补全 | 工具 | 说明 |
 |------|------|------|------|------|
-| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | Anthropic 兼容端点 |
-| Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | Anthropic 原生 API |
-| OpenAI (GPT) | ✅ | ✅ (chat FIM) | ✅ | OpenAI 原生 API |
+| Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | 原生 API + prompt caching + extended thinking |
+| OpenAI (GPT) | ✅ | ✅ (chat FIM) | ✅ | 原生 API |
+| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | OpenAI 兼容端点，自动格式路由 |
+| Google (Gemini) | ✅ | ✅ (chat FIM) | ✅ | 通过 `@ai-sdk/google` |
+| Azure OpenAI | ✅ | ✅ (chat FIM) | ✅ | 自定义 resource + deployment |
 | Ollama | ✅ | ✅ (FIM) | ✅ | 本地 LLM，/api/chat 原生格式 |
 
 ## License

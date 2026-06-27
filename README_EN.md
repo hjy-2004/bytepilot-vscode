@@ -7,17 +7,22 @@ Cursor-like AI coding assistant running entirely in VS Code. Multi-provider supp
 ## Features
 
 - **Chat** — AI conversation with streaming, AI decides when to stop
-- **Inline Completion** — Ghost-text suggestions on typing pause (Tab to accept)
+- **Inline Completion** — Ghost-text suggestions on typing pause (Tab to accept), scheduled delay (never dropped)
 - **Visual Diff & Approval** — Inline diff preview with Approve/Reject before every file edit, no modal popups
 - **File Editing** — Precise `old_string → new_string` replacement (Claude Code style)
 - **Tool System** — 8 built-in tools: read / write / edit / search / list / command / diagnostics / diff
-- **Multi-Provider** — Full Anthropic / OpenAI / DeepSeek / Ollama support with automatic format routing
+- **Multi-Provider** — Full Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama support
+- **Slash Commands `/`** — Type `/` for command menu (`/clear` `/config` `/sessions` `/rules` `/help`)
+- **Input History** — Press `↑`/`↓` in chat input to navigate up to 50 previous messages
 - **Image Paste & Upload** — Paste images from clipboard or click to upload from disk, vision model support
+- **Semantic Search** — BM25 code search engine, `search_files` with `semantic: true` for relevance ranking
 - **Project Rules** — Place `.bytepilotrules` in workspace root, auto-injected into AI system prompt
 - **Auto Config** — Reads `.claude/settings.json` on first launch, zero setup
 - **Multi-Session** — JSONL persistence with create/switch/delete, tool calls & diffs fully restored
+- **Incremental Saving** — Each tool result written to disk immediately, no data loss on crash
 - **Model Settings** — Click model badge to switch Provider / Model / Base URL / API Key
-- **Structured Logging** — Unified BytePilot output channel, auto-opens in debug mode
+- **Silent Commands** — Terminal no longer pops up for every command execution
+- **Structured Logging** — Unified BytePilot output channel with session diagnostics
 - **@file References** — Type `@filename` to search workspace files, content auto-attached as context
 
 ## Quick Start
@@ -57,12 +62,13 @@ npx vsce package
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `aiCodingAgent.provider` | `anthropic` | AI provider |
+| `aiCodingAgent.provider` | `anthropic` | AI provider (anthropic/openai/deepseek/google/azure-openai/ollama) |
 | `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | Chat model ID |
 | `aiCodingAgent.completionModel` | (empty) | Completion model (defaults to chat) |
 | `aiCodingAgent.baseURL` | (empty) | Custom API endpoint |
 | `aiCodingAgent.temperature` | `0.7` | Creativity |
 | `aiCodingAgent.maxTokens` | `4096` | Response limit |
+| `aiCodingAgent.thinkingBudget` | `4096` | Extended thinking budget (0=disabled) |
 | `aiCodingAgent.maxAgentSteps` | `500` | Agent loop safety cap |
 | `aiCodingAgent.toolApprovalLevel` | `writeOnly` | Approval: always / writeOnly / never |
 | `aiCodingAgent.completionsEnabled` | `true` | Enable completions |
@@ -134,9 +140,11 @@ extension_plugin/
 
 | Provider | Chat | Completion | Tools | Notes |
 |----------|------|------------|-------|-------|
-| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | Anthropic-compatible endpoint |
-| Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | Native Anthropic API |
-| OpenAI (GPT) | ✅ | ✅ (chat FIM) | ✅ | Native OpenAI API |
+| Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | Native API + prompt caching + extended thinking |
+| OpenAI (GPT) | ✅ | ✅ (chat FIM) | ✅ | Native API |
+| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | OpenAI-compatible endpoint, auto routing |
+| Google (Gemini) | ✅ | ✅ (chat FIM) | ✅ | Via `@ai-sdk/google` |
+| Azure OpenAI | ✅ | ✅ (chat FIM) | ✅ | Custom resource + deployment |
 | Ollama | ✅ | ✅ (FIM) | ✅ | Local LLM, `/api/chat` native format |
 
 ## License

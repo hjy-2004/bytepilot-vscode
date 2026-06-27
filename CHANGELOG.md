@@ -4,6 +4,34 @@ All notable changes to BytePilot will be documented in this file.
 
 ---
 
+## [0.4.0] - 2026-06-27
+
+### Added
+- **Google Gemini & Azure OpenAI**: Gemini (`gemini-2.5-pro/flash`) via `@ai-sdk/google` and Azure OpenAI support in chat and completions.
+- **Slash commands `/`**: Type `/` in chat input to access `/clear`, `/config`, `/sessions`, `/rules`, `/help` with dropdown selector.
+- **Input history navigation**: Press `↑`/`↓` in chat input to cycle through up to 50 previous messages.
+- **Semantic code search**: BM25 code search engine (`search_files` with `semantic: true`) for relevance-ranked results.
+- **DeepSeek in config wizard**: DeepSeek now appears as a selectable provider in the configuration flow.
+- **ESLint flat config**: Project-level linting with 0 errors.
+- **GitHub Actions CI/CD**: CI pipeline (lint, build, test, package) on push; auto-release on tag push.
+- **Diagnostic logging**: `[saveFullHistory]`, `[loadSessionMessages]`, `[extractRestoreMessages]` log entries for session debugging.
+
+### Fixed
+- **History persistence**: `saveFullHistory` and `appendMessage` now preserve `toolCallId` and `toolCalls` fields. Tool calls and diffs survive restarts.
+- **Empty-content tool messages**: Assistant messages with tool calls but empty text (`content: ""`) are no longer dropped during load/restore.
+- **`extractRestoreMessages` format**: Now handles both AI SDK internal format and BytePilot's flat `Message` format (with `m.toolCalls` property).
+- **Completion debouncer**: Changed from drop-based to schedule-based — completions are delayed, never dropped.
+- **DeepSeek completion routing**: When provider is `anthropic` with DeepSeek baseURL, completions correctly route to DeepSeek FIM endpoint instead of 404.
+- **`execute_command` silent mode**: Terminal window no longer pops up for every command; only shown when `showTerminal: true`.
+
+### Changed
+- **Provider picker**: Configure AI Provider now lists all 6 supported providers (Anthropic, OpenAI, DeepSeek, Google, Azure OpenAI, Ollama).
+- **Security: WebView API key isolation**: `config.set` no longer accepts `apiKey` from WebView. Keys can only be set via VS Code commands using `SecretStorage`.
+- **Security: CSP hardened**: `unsafe-inline` removed from Content-Security-Policy.
+- **Session storage**: Directory hashing upgraded from weak hashCode to SHA-256 with backward-compatible migration.
+
+---
+
 ## [0.3.1] - 2026-06-25
 
 ### Added
