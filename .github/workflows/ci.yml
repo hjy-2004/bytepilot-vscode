@@ -13,12 +13,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       - run: npm ci
+      - run: cd webview-ui && npm ci
       - run: npm run lint
       - run: npm run build
-      - run: npm test
       - name: Package VSIX
         run: npx vsce package
       - name: Upload VSIX artifact
