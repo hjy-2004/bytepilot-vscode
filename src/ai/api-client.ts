@@ -57,6 +57,9 @@ export async function streamChat(
   const provider = config.provider || 'anthropic';
   switch (provider) {
     case 'openai':
+    case 'deepseek':
+    case 'google':
+    case 'azure-openai':
       return streamChatOpenAI(config, messages, tools, onToken, signal);
     case 'ollama':
       return streamChatOllama(config, messages, tools, onToken, signal);
@@ -208,7 +211,7 @@ async function streamChatAnthropic(
               stopReason = j.delta.stop_reason;
             }
           }
-        } catch {}
+        } catch { /* skip malformed SSE lines */ }
       }
     }
   } finally { reader.releaseLock(); }
@@ -355,7 +358,7 @@ async function streamChatOpenAI(
           if (choice.finish_reason) {
             stopReason = choice.finish_reason;
           }
-        } catch {}
+        } catch { /* skip malformed SSE lines */ }
       }
     }
   } finally { reader.releaseLock(); }
@@ -474,7 +477,7 @@ async function streamChatOllama(
             };
             stopReason = j.done_reason || 'stop';
           }
-        } catch {}
+        } catch { /* skip malformed SSE lines */ }
       }
     }
   } finally { reader.releaseLock(); }

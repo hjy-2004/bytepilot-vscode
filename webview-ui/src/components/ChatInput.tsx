@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVSCode } from '../hooks/useVSCode';
+import { useChatStore } from '../state/chat-store';
 
 interface ChatInputProps {
   onSend: (content: string, attachments?: Array<{ name: string; content: string; type: 'image'; mimeType: string }>) => void;
@@ -8,6 +9,14 @@ interface ChatInputProps {
 }
 interface FileEntry { path: string; name: string; }
 interface ImageAttachment { name: string; content: string; type: 'image'; mimeType: string; }
+
+const SLASH_COMMANDS = [
+  { cmd: '/clear', description: 'Clear conversation' },
+  { cmd: '/config', description: 'Show current configuration' },
+  { cmd: '/sessions', description: 'List saved sessions' },
+  { cmd: '/rules', description: 'Edit .bytepilotrules' },
+  { cmd: '/help', description: 'Show all commands' },
+];
 
 export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStreaming }) => {
   const { postMessage } = useVSCode();
@@ -23,6 +32,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
   const [mentionIndex, setMentionIndex] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<FileEntry[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Slash commands
+  const [slashActive, setSlashActive] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  // Input history
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const historyDraft = useRef<string>('');
 
   // Listen for file search results
   useEffect(() => {
@@ -52,6 +69,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
 
   const detectMention = useCallback((text: string, cursorPos: number) => {
     const before = text.substring(0, cursorPos);
+    // Detect slash command: must be at start of input or start of a line
+    if (before.startsWith('/') && !before.includes(' ') && cursorPos <= before.length) {
+      const q = before.substring(1);
+      setSlashActive(true);
+      setMentionActive(false);
+      const filtered = SLASH_COMMANDS.filter(c => c.cmd.startsWith('/' + q));
+      if (filtered.length > 0 && q.length > 0) {
+        setMentionFiles(filtered.map(c => ({ path: c.cmd, name: c.description })));
+      } else {
+        setMentionFiles(SLASH_COMMANDS.map(c => ({ path: c.cmd, name: c.description })));
+      }
+      setMentionQuery(q);
+      setSlashIndex(0);
+      return;
+    }
+    setSlashActive(false);
+    // @file autocomplete
     const atIdx = before.lastIndexOf('@');
     if (atIdx === -1 || (atIdx > 0 && before[atIdx - 1] !== ' ' && before[atIdx - 1] !== '\n')) {
       setMentionActive(false); setMentionQuery(''); return;
@@ -65,8 +99,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
+    setHistoryIndex(-1);
     detectMention(e.target.value, e.target.selectionStart);
   }, [detectMention]);
+
+  // Execute slash command
+  const executeSlashCommand = useCallback((cmd: string) => {
+    switch (cmd) {
+      case '/clear':
+        useChatStore.getState().clearMessages();
+        postMessage({ type: 'chat.clear' } as any);
+        break;
+      case '/config':
+        postMessage({ type: 'config.get' } as any);
+        break;
+      case '/sessions':
+        postMessage({ type: 'session.list' } as any);
+        break;
+      case '/rules':
+        postMessage({ type: 'context.refresh' } as any);
+        break;
+      case '/help':
+        setInput('/clear — Clear conversation\n/config — Show configuration\n/sessions — List sessions\n/rules — Refresh project rules\n/help — Show this help');
+        return;
+    }
+    setInput('');
+    setMentionActive(false);
+    setSlashActive(false);
+  }, [postMessage]);
 
   // Image paste handler
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
@@ -132,21 +192,61 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
   }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Slash command dropdown navigation
+    if (slashActive && mentionFiles.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex(i => Math.min(i + 1, mentionFiles.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); executeSlashCommand(mentionFiles[slashIndex].path); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setSlashActive(false); setMentionFiles([]); return; }
+    }
+    // @file mention dropdown navigation
     if (mentionActive && mentionFiles.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionFiles.length - 1)); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionFiles[mentionIndex]); return; }
       if (e.key === 'Escape') { e.preventDefault(); setMentionActive(false); return; }
     }
+    // Input history navigation (only when input is empty or at beginning of history)
+    if (e.key === 'ArrowUp' && !input.trim()) {
+      e.preventDefault();
+      const history = useChatStore.getState().inputHistory;
+      if (history.length === 0) return;
+      if (historyIndex === -1) {
+        historyDraft.current = input;
+        const newIdx = history.length - 1;
+        setHistoryIndex(newIdx);
+        setInput(history[newIdx]);
+      } else if (historyIndex > 0) {
+        const newIdx = historyIndex - 1;
+        setHistoryIndex(newIdx);
+        setInput(history[newIdx]);
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown' && historyIndex >= 0) {
+      e.preventDefault();
+      const history = useChatStore.getState().inputHistory;
+      if (historyIndex < history.length - 1) {
+        const newIdx = historyIndex + 1;
+        setHistoryIndex(newIdx);
+        setInput(history[newIdx]);
+      } else {
+        setHistoryIndex(-1);
+        setInput(historyDraft.current);
+        historyDraft.current = '';
+      }
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
     if (e.key === 'Escape' && isStreaming) onCancel();
-  }, [mentionActive, mentionFiles, mentionIndex, insertMention, isStreaming, onCancel]);
+  }, [mentionActive, mentionFiles, mentionIndex, slashActive, slashIndex, historyIndex, input, insertMention, isStreaming, onCancel, executeSlashCommand]);
 
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
     if ((!trimmed && imageAttachments.length === 0) || isStreaming) return;
+    useChatStore.getState().addToInputHistory(trimmed);
     onSend(trimmed, imageAttachments.length > 0 ? imageAttachments : undefined);
-    setInput(''); setSelectedFiles([]); setImageAttachments([]);
+    setInput(''); setSelectedFiles([]); setImageAttachments([]); setHistoryIndex(-1);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   }, [input, imageAttachments, isStreaming, onSend]);
 
@@ -173,14 +273,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
           ))}
         </div>
       )}
-      {mentionActive && (
+      {(mentionActive || slashActive) && (
         <div ref={dropdownRef} style={{ position: 'absolute', bottom: '100%', left: '8px', maxHeight: '200px', overflow: 'auto', background: 'var(--vscode-dropdown-background)', border: '1px solid var(--vscode-dropdown-border)', borderRadius: '4px', zIndex: 100, minWidth: '200px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
           {mentionFiles.length === 0 ? (
             <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--vscode-descriptionForeground)' }}>{mentionQuery ? 'No matching files' : 'Type to search files...'}</div>
           ) : mentionFiles.map((f, i) => (
-            <div key={f.path} onClick={() => insertMention(f)} onMouseEnter={() => setMentionIndex(i)}
-              style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer', background: i === mentionIndex ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent', color: i === mentionIndex ? 'var(--vscode-list-activeSelectionForeground)' : 'var(--vscode-foreground)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{f.name}</span><span style={{ opacity: 0.5, fontSize: '11px' }}>{f.path}</span>
+            <div key={f.path} onClick={() => slashActive ? executeSlashCommand(f.path) : insertMention(f)} onMouseEnter={() => slashActive ? setSlashIndex(i) : setMentionIndex(i)}
+              style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer', background: i === (slashActive ? slashIndex : mentionIndex) ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent', color: i === (slashActive ? slashIndex : mentionIndex) ? 'var(--vscode-list-activeSelectionForeground)' : 'var(--vscode-foreground)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{slashActive ? f.path : f.name}</span><span style={{ opacity: 0.5, fontSize: '11px' }}>{slashActive ? f.name : f.path}</span>
             </div>
           ))}
         </div>

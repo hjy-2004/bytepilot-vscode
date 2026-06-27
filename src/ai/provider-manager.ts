@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import type { LanguageModelV1 } from 'ai';
 import { createProvider } from './provider-factory';
 import { SecretsStore } from './secrets-store';
@@ -100,11 +103,8 @@ export class ProviderManager implements vscode.Disposable {
     return this.initialized;
   }
 
-  private readClaudeConfigKey(provider: string): string | undefined {
+  private readClaudeConfigKey(_provider: string): string | undefined {
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const os = require('os');
       const claudePath = path.join(os.homedir(), '.claude', 'settings.json');
       if (!fs.existsSync(claudePath)) return undefined;
 

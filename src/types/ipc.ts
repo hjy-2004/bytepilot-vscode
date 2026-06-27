@@ -31,7 +31,6 @@ export interface ConfigSetMessage {
     provider?: string;
     chatModel?: string;
     completionModel?: string;
-    apiKey?: string;
     baseURL?: string;
   };
 }

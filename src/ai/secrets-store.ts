@@ -30,7 +30,7 @@ export class SecretsStore implements vscode.Disposable {
       this.onDidChangeEmitter.fire();
     } catch (err) {
       logError(`Failed to store API key for ${provider}`, err);
-      throw new Error(`Failed to store API key: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(`Failed to store API key: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     }
   }
 

@@ -2,7 +2,7 @@ import type { LanguageModelV1 } from 'ai';
 import { ToolRegistry } from '../tools/registry';
 import { StreamBridge } from './stream-bridge';
 import { logInfo, logError } from '../utils/logger';
-import { saveFullHistory } from '../chat/history';
+import { saveFullHistory, appendMessage } from '../chat/history';
 import { runAgentLoop, type AgentCallbacks } from './agent-loop';
 import { estimateTokens, trimContextToBudget } from '../utils/token-counter';
 import * as vscode from 'vscode';
@@ -144,7 +144,7 @@ export class ChatEngine {
           (p.properties as any)[k] = { type: tmap[tn as string] || 'string', description: (s as any)?._def?.description || '' };
           if (tn !== 'ZodOptional') (p.required as string[]).push(k);
         }
-      } catch {}
+      } catch { /* skip non-Zod or malformed schemas */ }
       return { name: t.name, description: t.description, parameters: p };
     });
 
@@ -179,6 +179,16 @@ export class ChatEngine {
         } catch (e: any) { return { result: `Error: ${e.message}`, success: false }; }
       },
       isReadOnly: (name) => { const t = this.toolRegistry.get(name); return t?.isReadOnly() ?? false; },
+      onHistoryChanged: () => {
+        if (!this.workspacePath || !this.getSessionId) return;
+        const sid = this.getSessionId();
+        if (!sid) return;
+        // Incrementally persist the full message (including toolCallId/toolCalls) to JSONL
+        const lastMsg = this.history[this.history.length - 1];
+        if (lastMsg) {
+          appendMessage(this.workspacePath, sid, lastMsg);
+        }
+      },
     };
 
     // Clean up old-format tool messages that might lack toolCallId

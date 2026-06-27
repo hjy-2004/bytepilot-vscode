@@ -69,6 +69,9 @@ interface ChatStore {
   updateContext: (info: { openFiles: string[]; projectFiles: number; diagnosticsCount: number; hasRules?: boolean }) => void;
   addErrorMessage: (content: string) => void;
   restoreMessages: (msgs: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number; toolCalls?: ToolCallEntry[] }>) => void;
+  // Input history
+  inputHistory: string[];
+  addToInputHistory: (text: string) => void;
 }
 
 let nextId = 0;
@@ -84,6 +87,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   configLoaded: false,
   permissionRequest: null,
   contextInfo: { openFiles: [], projectFiles: 0, diagnosticsCount: 0, hasRules: false },
+  inputHistory: [],
 
   addUserMessage: (content: string) => {
     const msg: ChatMessage = {
@@ -192,6 +196,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       })),
       streamingText: '',
       isStreaming: false,
+    });
+  },
+
+  addToInputHistory: (text: string) => {
+    if (!text.trim()) return;
+    set((s) => {
+      // Avoid consecutive duplicates
+      if (s.inputHistory[s.inputHistory.length - 1] === text) return s;
+      return { inputHistory: [...s.inputHistory, text].slice(-50) };
     });
   },
 }));

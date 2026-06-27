@@ -4,8 +4,8 @@ import { ChatPanel } from './panel';
 import { ChatEngine } from '../ai/chat-engine';
 import { ToolRegistry } from '../tools/registry';
 import { getConfigState } from '../config/settings';
-import { scanKnownLocations, importCachedConfig } from '../config/importer';
-import { listSessions, createSession as createSessionFile, switchSession as switchSessionFile, deleteSession as deleteSessionFile, loadSessionMessages, loadSessionDiffs } from './history';
+import { scanKnownLocations } from '../config/importer';
+import { listSessions, createSession as createSessionFile, deleteSession as deleteSessionFile, loadSessionMessages, loadSessionDiffs } from './history';
 import { logInfo, logError } from '../utils/logger';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
 import type { Message } from '../ai/message-types';
@@ -225,12 +225,14 @@ export class MessageRouter implements vscode.Disposable {
       }
 
       case 'config.set': {
-        const { provider, chatModel, completionModel, baseURL, apiKey } = (message as any).payload || {};
+        const { provider, chatModel, completionModel, baseURL } = (message as any).payload || {};
         const cfg = vscode.workspace.getConfiguration('aiCodingAgent');
         if (provider) await cfg.update('provider', provider, vscode.ConfigurationTarget.Global);
         if (chatModel) await cfg.update('chatModel', chatModel, vscode.ConfigurationTarget.Global);
         if (completionModel !== undefined) await cfg.update('completionModel', completionModel, vscode.ConfigurationTarget.Global);
         if (baseURL !== undefined) await cfg.update('baseURL', baseURL, vscode.ConfigurationTarget.Global);
+        // NOTE: apiKey is intentionally NOT accepted from WebView for security.
+        // API keys can only be set via the "Configure AI Provider" command (uses SecretStorage).
         setTimeout(() => reply({ type: 'config.state', payload: getConfigState() }), 500);
         break;
       }
@@ -414,9 +416,18 @@ export class MessageRouter implements vscode.Disposable {
     }>;
   }> {
     // Collect tool results by toolCallId (from tool-role messages)
+    // Handles both AI SDK internal format (content blocks) and our flat Message format
     const toolResults = new Map<string, { result: string; success: boolean }>();
     for (const m of history) {
-      if (m.role === 'tool' && Array.isArray(m.content)) {
+      if (m.role !== 'tool') continue;
+      // Our flat format: { role: 'tool', toolCallId: 'xxx', content: 'result string' }
+      if (m.toolCallId && typeof m.content === 'string') {
+        toolResults.set(m.toolCallId, {
+          result: m.content,
+          success: !m.content.startsWith('Error'),
+        });
+      } else if (Array.isArray(m.content)) {
+        // AI SDK format: content is an array of tool-result blocks
         for (const p of m.content as any[]) {
           if (p.type === 'tool-result' && p.toolCallId) {
             toolResults.set(p.toolCallId, {
@@ -448,7 +459,8 @@ export class MessageRouter implements vscode.Disposable {
     for (let i = 0; i < history.length; i++) {
       const m = history[i];
       if (m.role !== 'user' && m.role !== 'assistant') continue;
-      if (!m.content) continue;
+      // content may be empty string when message only contains tool calls
+      if (m.content == null) continue;
 
       let text = '';
       const toolCalls: Array<{
@@ -484,6 +496,23 @@ export class MessageRouter implements vscode.Disposable {
         }
       }
 
+      // Our flat format: toolCalls are a separate property on the Message
+      if (m.role === 'assistant' && m.toolCalls?.length) {
+        for (const tc of m.toolCalls) {
+          const tr = toolResults.get(tc.id);
+          toolCalls.push({
+            id: tc.id,
+            name: tc.name,
+            displayName: this.toolRegistry.getDisplayName(tc.name) || tc.name,
+            args: tc.args,
+            result: tr?.result,
+            success: tr?.success,
+            status: tr ? ('done' as const) : ('error' as const),
+            diff: diffs?.get(tc.id),
+          });
+        }
+      }
+
       if (!text.trim() && toolCalls.length === 0) continue;
 
       messages.push({
@@ -495,6 +524,9 @@ export class MessageRouter implements vscode.Disposable {
       });
     }
 
+    const withToolCalls = messages.filter(m => (m.toolCalls?.length || 0) > 0).length;
+    const totalToolCalls = messages.reduce((sum, m) => sum + (m.toolCalls?.length || 0), 0);
+    logInfo(`[extractRestoreMessages] Input: ${history.length} msgs | Output: ${messages.length} msgs, ${withToolCalls} with toolCalls (${totalToolCalls} total tool calls)`);
     return messages;
   }
 

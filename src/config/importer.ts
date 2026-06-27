@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { execSync } from 'child_process';
 import { logInfo, logError } from '../utils/logger';
 import type { ProviderId } from '../types/ai';
 
@@ -34,6 +35,9 @@ export function getDisplayProvider(provider: string, baseURL?: string, chatModel
   if (url.includes('minimax') || model.includes('minimax')) return 'MiniMax';
   if (url.includes('qwen') || model.includes('qwen')) return 'Qwen';
   if (url.includes('ollama') || url.includes('localhost:11434')) return 'Ollama';
+  if (url.includes('deepseek')) return 'DeepSeek';
+  if (url.includes('googleapis') || url.includes('generativelanguage')) return 'Gemini';
+  if (url.includes('azure') || url.includes('openai.azure')) return 'Azure OpenAI';
   if (url.includes('openai') || provider === 'openai') return 'OpenAI';
   if (provider === 'anthropic') return 'Anthropic';
 
@@ -111,7 +115,7 @@ function parseClaudeConfig(content: string, filePath: string): ImportedConfig | 
       const apiKeyHelper = data.apiKeyHelper;
       if (apiKeyHelper && typeof apiKeyHelper === 'string') {
         try {
-          const result = require('child_process').execSync(apiKeyHelper, {
+          const result = execSync(apiKeyHelper, {
             encoding: 'utf-8', timeout: 5000,
           }).trim();
           if (result && !result.startsWith('Error')) apiKey = result;
@@ -126,10 +130,12 @@ function parseClaudeConfig(content: string, filePath: string): ImportedConfig | 
     const urlLower = (baseURL || '').toLowerCase();
     if (urlLower.includes('openai.com') || env.OPENAI_API_KEY) {
       provider = 'openai';
+    } else if (urlLower.includes('deepseek.com') || env.DEEPSEEK_API_KEY) {
+      provider = 'deepseek';
     } else if (urlLower.includes('localhost:11434') || urlLower.includes('ollama')) {
       provider = 'ollama';
     }
-    // Keep 'anthropic' for any other custom endpoints (like DeepSeek)
+    // Keep 'anthropic' for any other custom endpoints
 
     return {
       provider,
@@ -472,12 +478,14 @@ function inferProvider(model?: string, url?: string): ProviderId {
     const lower = url.toLowerCase();
     if (lower.includes('openai') || lower.includes('api.openai.com')) return 'openai';
     if (lower.includes('anthropic') || lower.includes('api.anthropic.com')) return 'anthropic';
+    if (lower.includes('deepseek')) return 'deepseek';
     if (lower.includes('localhost:11434') || lower.includes('ollama')) return 'ollama';
   }
   if (model) {
     const lower = model.toLowerCase();
     if (lower.includes('claude')) return 'anthropic';
     if (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3')) return 'openai';
+    if (lower.includes('deepseek')) return 'deepseek';
   }
   return 'anthropic'; // Default
 }

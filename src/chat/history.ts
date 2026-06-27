@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import crypto from 'crypto';
 import type { Message } from '../ai/message-types';
 import { logInfo, logError } from '../utils/logger';
 import type { UnifiedDiff } from '../types/diff';
@@ -36,7 +37,12 @@ interface HistoryEntry {
 // Path helpers
 // ============================================================
 
-function hashPath(p: string): string {
+function sha256Hash(p: string): string {
+  return crypto.createHash('sha256').update(p).digest('hex').substring(0, 12);
+}
+
+/** Legacy hashCode for backward compatibility with existing session dirs */
+function legacyHash(p: string): string {
   let hash = 0;
   for (let i = 0; i < p.length; i++) {
     hash = ((hash << 5) - hash) + p.charCodeAt(i);
@@ -46,9 +52,27 @@ function hashPath(p: string): string {
 }
 
 function getProjectDir(workspacePath: string): string {
-  const dir = path.join(BASE_DIR, hashPath(workspacePath));
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  return dir;
+  // Prefer SHA-256 hash for new sessions
+  const newDir = path.join(BASE_DIR, sha256Hash(workspacePath));
+  if (fs.existsSync(newDir)) {
+    return newDir;
+  }
+
+  // Fallback to legacy hashCode dir for backward compatibility
+  const oldDir = path.join(BASE_DIR, legacyHash(workspacePath));
+  if (fs.existsSync(oldDir)) {
+    // Migrate: rename old dir to new dir
+    try {
+      fs.renameSync(oldDir, newDir);
+    } catch {
+      // If rename fails (e.g. permissions), just use old dir
+      return oldDir;
+    }
+  }
+
+  // Create new directory with SHA-256 hash
+  if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true, mode: 0o700 });
+  return newDir;
 }
 
 function generateId(): string {
@@ -97,7 +121,7 @@ function readSessionInfo(filePath: string): { title: string; count: number } {
     const lines = content.trim().split('\n').filter(Boolean);
     // First user message is the title
     let title = '';
-    let count = lines.length;
+    const count = lines.length;
     // Check first few lines for a user message (title)
     for (let i = 0; i < Math.min(lines.length, 5); i++) {
       try {
@@ -106,7 +130,7 @@ function readSessionInfo(filePath: string): { title: string; count: number } {
           title = entry.content.substring(0, 60) + (entry.content.length > 60 ? '...' : '');
           break;
         }
-      } catch {}
+      } catch { /* skip malformed JSON entries */ }
     }
     return { title, count };
   } catch {
@@ -173,17 +197,30 @@ export function loadSessionMessages(workspacePath: string, sessionId: string): M
     if (!fs.existsSync(filePath)) return [];
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(Boolean);
-    const entries: HistoryEntry[] = [];
+    const entries: Array<HistoryEntry & { toolCallId?: string; toolCalls?: unknown[] }> = [];
     for (let i = lines.length - 1; i >= 0 && entries.length < MAX_ENTRIES; i--) {
       try {
-        const e = JSON.parse(lines[i]) as { role: string; content: unknown; timestamp?: number };
-        if (e.role && e.content && e.role !== '__diff') {
-          entries.push({ role: e.role as HistoryEntry['role'], content: e.content as HistoryEntry['content'], timestamp: e.timestamp || 0 });
+        const raw = JSON.parse(lines[i]) as { role: string; content: unknown; timestamp?: number; toolCallId?: string; toolCalls?: unknown[] };
+        if (raw.role && raw.content != null && raw.role !== '__diff') {
+          entries.push({
+            role: raw.role as HistoryEntry['role'],
+            content: raw.content as HistoryEntry['content'],
+            timestamp: raw.timestamp || 0,
+            toolCallId: raw.toolCallId,
+            toolCalls: raw.toolCalls,
+          });
         }
-      } catch {}
+      } catch { /* skip malformed JSON entries */ }
     }
-    logInfo(`Loaded ${entries.length} messages from session ${sessionId}`);
-    return entries.reverse().map(e => ({ role: e.role, content: e.content } as Message));
+    const withTC = entries.filter((x: any) => x.toolCalls?.length > 0).length;
+    const withTCI = entries.filter((x: any) => x.toolCallId).length;
+    logInfo(`[loadSessionMessages] Loaded ${entries.length} entries (${withTC} with toolCalls, ${withTCI} with toolCallId) from session ${sessionId}`);
+    return entries.reverse().map((e) => {
+      const msg: Message = { role: e.role, content: e.content as string };
+      if (e.toolCallId) msg.toolCallId = e.toolCallId;
+      if (e.toolCalls) msg.toolCalls = e.toolCalls as Message['toolCalls'];
+      return msg;
+    });
   } catch (err) {
     logError('Failed to load session messages', err);
     return [];
@@ -205,10 +242,10 @@ export function loadSessionDiffs(workspacePath: string, sessionId: string): Map<
         if (e.role === '__diff' && e.content?.toolCallId && e.content?.diff) {
           diffs.set(e.content.toolCallId, e.content.diff as UnifiedDiff);
         }
-      } catch {}
+      } catch { /* skip malformed JSON entries */ }
     }
     logInfo(`Loaded ${diffs.size} diffs from session ${sessionId}`);
-  } catch {}
+  } catch { /* session read failed */ }
   return diffs;
 }
 
@@ -220,7 +257,7 @@ function pruneSessionFile(filePath: string): void {
     if (lines.length <= MAX_ENTRIES) return;
     const kept = lines.slice(-MAX_ENTRIES);
     fs.writeFileSync(filePath, kept.join('\n') + '\n', { mode: 0o600 });
-  } catch {}
+  } catch { /* prune failed, non-critical */ }
 }
 
 // ============================================================
@@ -251,6 +288,8 @@ export function saveFullHistory(
         role: m.role,
         content: m.content,
         timestamp: Date.now(),
+        toolCallId: m.toolCallId,
+        toolCalls: m.toolCalls,
       }));
 
     // Append all diffs as __diff entries (for UI restore, not sent to AI)
@@ -262,7 +301,9 @@ export function saveFullHistory(
 
     const lines = entries.map(e => JSON.stringify(e) + '\n').join('');
     fs.writeFileSync(filePath, lines, { encoding: 'utf-8', mode: 0o600 });
-    logInfo(`Saved ${entries.length} messages to session ${sessionId}`);
+    const withTC = entries.filter((e: any) => e.toolCalls?.length > 0).length;
+    const withTCI = entries.filter((e: any) => e.toolCallId).length;
+    logInfo(`[saveFullHistory] Saved ${entries.length} entries (${withTC} with toolCalls, ${withTCI} with toolCallId) to session ${sessionId}`);
   } catch (err) {
     logError('Failed to save full history', err);
   }
@@ -274,6 +315,29 @@ export function saveUserMessage(workspacePath: string, sessionId: string, conten
 
 export function saveAssistantMessage(workspacePath: string, sessionId: string, content: string): void {
   saveMessage(workspacePath, sessionId, 'assistant', content);
+}
+
+/** Append a single message entry to the session JSONL file. Used for incremental saves. */
+export function appendMessage(
+  workspacePath: string,
+  sessionId: string,
+  msg: Message,
+): void {
+  if (!workspacePath || !sessionId) return;
+  try {
+    const filePath = path.join(getProjectDir(workspacePath), `${sessionId}.jsonl`);
+    const entry: HistoryEntry & { toolCallId?: string; toolCalls?: unknown[] } = {
+      role: msg.role,
+      content: msg.content,
+      timestamp: Date.now(),
+    };
+    // Preserve tool call metadata for proper session restore
+    if (msg.toolCallId) entry.toolCallId = msg.toolCallId;
+    if (msg.toolCalls) entry.toolCalls = msg.toolCalls as unknown[];
+    fs.appendFileSync(filePath, JSON.stringify(entry) + '\n', { encoding: 'utf-8', mode: 0o600 });
+  } catch (err) {
+    logError('Failed to append message', err);
+  }
 }
 
 export function maybePruneHistory(_workspacePath: string): void {

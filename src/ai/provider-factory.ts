@@ -1,5 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { LanguageModelV1 } from 'ai';
 import type { ProviderConfig } from '../types/ai';
 import { logProviderConfig } from '../utils/ai-logger';
@@ -66,6 +67,43 @@ export function createProvider(config: ProviderConfig & { apiKey?: string }): {
       return {
         chatModel: ollama(config.chatModel),
         completionModel: ollama(config.completionModel),
+      };
+    }
+    case 'deepseek': {
+      // DeepSeek uses OpenAI-compatible endpoint
+      const modelName = config.chatModel.replace(/\[.*\]$/, '').trim();
+      const completionName = config.completionModel.replace(/\[.*\]$/, '').trim();
+      const deepseek = createOpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseURL || 'https://api.deepseek.com/v1',
+        compatibility: 'compatible',
+      });
+      return {
+        chatModel: deepseek(modelName),
+        completionModel: deepseek(completionName || modelName),
+      };
+    }
+    case 'google': {
+      const google = createGoogleGenerativeAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseURL,
+      });
+      return {
+        chatModel: google(config.chatModel),
+        completionModel: google(config.completionModel),
+      };
+    }
+    case 'azure-openai': {
+      // Azure OpenAI: baseURL should be like https://{resource}.openai.azure.com/openai/v1
+      // Or configure via baseURL + apiKey with api-key header
+      const azure = createOpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseURL || 'https://api.openai.com/v1',
+        compatibility: 'compatible',
+      });
+      return {
+        chatModel: azure(config.chatModel),
+        completionModel: azure(config.completionModel),
       };
     }
     default:

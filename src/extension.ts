@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { ChatPanel } from './chat/panel';
 import { DisposableStore } from './utils/disposable';
 import { logInfo, logError, disposeLogger, getLogger, showLogger } from './utils/logger';
@@ -239,6 +240,9 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
         [
           { label: 'Anthropic (Claude)', description: 'api.anthropic.com', value: 'anthropic' },
           { label: 'OpenAI (GPT)', description: 'api.openai.com', value: 'openai' },
+          { label: 'DeepSeek', description: 'api.deepseek.com', value: 'deepseek' },
+          { label: 'Google (Gemini)', description: 'generativelanguage.googleapis.com', value: 'google' },
+          { label: 'Azure OpenAI', description: '{resource}.openai.azure.com', value: 'azure-openai' },
           { label: 'Ollama (Local)', description: 'localhost:11434', value: 'ollama' },
         ],
         { placeHolder: `Current: ${currentProvider}. Select AI provider` }
@@ -343,7 +347,7 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
       await config.update('baseURL', undefined, vscode.ConfigurationTarget.Global);
 
       // Clear all stored API keys
-      for (const provider of ['openai', 'anthropic', 'ollama'] as const) {
+      for (const provider of ['openai', 'anthropic', 'ollama', 'deepseek', 'google', 'azure-openai'] as const) {
         await secretsStore.deleteApiKey(provider);
       }
 
@@ -361,7 +365,7 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
     vscode.commands.registerCommand('aiCodingAgent.showConfig', async () => {
       const config = providerManager.getConfig();
       const apiKey = config?.apiKey;
-      const claudePath = path.join(require('os').homedir(), '.claude', 'settings.json');
+      const claudePath = path.join(os.homedir(), '.claude', 'settings.json');
       const claudeExists = fs.existsSync(claudePath);
 
       const lines = [
@@ -405,15 +409,13 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
     vscode.commands.registerCommand('aiCodingAgent.debugSessions', async () => {
       const ws = getWorkspaceRoot();
       const dbgLines: string[] = [];
-      const sessionDir = require('path').join(require('os').homedir(), '.ai-coding-agent', 'projects');
+      const sessionDir = path.join(os.homedir(), '.ai-coding-agent', 'projects');
       dbgLines.push(`Session DB dir: ${sessionDir}`);
       dbgLines.push(`Workspace: ${ws}`);
       dbgLines.push(`Active session: ${messageRouter?.getActiveSession() || 'N/A'}`);
-
-      const fs2 = require('fs');
-      dbgLines.push(`Dir exists: ${fs2.existsSync(sessionDir)}`);
-      if (fs2.existsSync(sessionDir)) {
-        const projectDirs = fs2.readdirSync(sessionDir);
+      dbgLines.push(`Dir exists: ${fs.existsSync(sessionDir)}`);
+      if (fs.existsSync(sessionDir)) {
+        const projectDirs = fs.readdirSync(sessionDir);
         dbgLines.push(`Project dirs: ${projectDirs.join(', ') || '(empty)'}`);
       }
 

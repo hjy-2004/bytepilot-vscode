@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { logInfo, logError } from '../utils/logger';
+import { logInfo } from '../utils/logger';
 import type { WebViewMessage, ExtensionMessage } from '../types/ipc';
 
 /**
@@ -238,7 +238,7 @@ export class ChatPanel {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource}; font-src ${this.panel.webview.cspSource}; img-src ${this.panel.webview.cspSource} data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource}; script-src ${this.panel.webview.cspSource}; font-src ${this.panel.webview.cspSource}; img-src ${this.panel.webview.cspSource} data:;">
   ${styleUri ? `<link rel="stylesheet" href="${styleUri}">` : ''}
   <title>AI Chat</title>
   <style>

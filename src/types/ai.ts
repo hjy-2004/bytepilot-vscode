@@ -1,5 +1,5 @@
 /** Supported provider identifiers */
-export type ProviderId = 'openai' | 'anthropic' | 'ollama';
+export type ProviderId = 'openai' | 'anthropic' | 'ollama' | 'deepseek' | 'google' | 'azure-openai';
 
 /** Resolved configuration for a single provider */
 export interface ProviderConfig {
@@ -25,6 +25,9 @@ export const PROVIDER_DEFAULTS: Record<ProviderId, { chatModel: string; completi
   openai: { chatModel: 'gpt-4o', completionModel: 'gpt-4o-mini' },
   anthropic: { chatModel: 'claude-sonnet-4-6', completionModel: 'claude-haiku-4-5-20251001' },
   ollama: { chatModel: 'codellama', completionModel: 'codellama' },
+  deepseek: { chatModel: 'deepseek-v4-pro[1m]', completionModel: 'deepseek-v4-pro[1m]' },
+  google: { chatModel: 'gemini-2.5-pro', completionModel: 'gemini-2.5-flash' },
+  'azure-openai': { chatModel: 'gpt-4o', completionModel: 'gpt-4o-mini' },
 };
 
 /** Known models per provider (for UI display; actual models fetched from APIs in future) */
@@ -51,5 +54,20 @@ export const KNOWN_MODELS: Record<ProviderId, ModelInfo[]> = {
     { id: 'deepseek-coder-v2', name: 'DeepSeek Coder V2' },
     { id: 'mistral', name: 'Mistral' },
     { id: 'qwen2.5-coder', name: 'Qwen 2.5 Coder' },
+  ],
+  deepseek: [
+    { id: 'deepseek-v4-pro[1m]', name: 'DeepSeek V4 Pro (1M)' },
+    { id: 'deepseek-v3', name: 'DeepSeek V3' },
+    { id: 'deepseek-r1', name: 'DeepSeek R1' },
+  ],
+  google: [
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+  ],
+  'azure-openai': [
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
   ],
 };

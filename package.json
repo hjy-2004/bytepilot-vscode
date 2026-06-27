@@ -158,7 +158,7 @@
         },
         "aiCodingAgent.completionTemperature": {
           "type": "number",
-          "default": 0.0,
+          "default": 0,
           "minimum": 0,
           "maximum": 2,
           "description": "Temperature for inline completions. Lower = more deterministic."
@@ -185,9 +185,18 @@
             "folder": true
           },
           "properties": {
-            "code": { "type": "boolean", "description": "Include open file context" },
-            "problems": { "type": "boolean", "description": "Include diagnostics/errors" },
-            "folder": { "type": "boolean", "description": "Include project structure" }
+            "code": {
+              "type": "boolean",
+              "description": "Include open file context"
+            },
+            "problems": {
+              "type": "boolean",
+              "description": "Include diagnostics/errors"
+            },
+            "folder": {
+              "type": "boolean",
+              "description": "Include project structure"
+            }
           },
           "description": "Context providers to include in prompts."
         },
@@ -222,19 +231,23 @@
     "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/diff": "^7.0.0",
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.24.0",
+    "eslint": "^10.6.0",
     "typescript": "^5.5.0",
-    "@vscode/vsce": "^3.0.0"
+    "typescript-eslint": "^8.62.0"
   },
   "dependencies": {
-    "ai": "^4.0.0",
-    "@ai-sdk/openai": "^1.0.0",
     "@ai-sdk/anthropic": "^1.0.0",
-    "zod": "^3.23.0",
+    "@ai-sdk/google": "^1.2.22",
+    "@ai-sdk/openai": "^1.0.0",
+    "ai": "^4.0.0",
+    "diff": "^7.0.0",
     "ignore": "^7.0.0",
-    "diff": "^7.0.0"
+    "zod": "^3.23.0"
   }
 }

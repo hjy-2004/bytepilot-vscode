@@ -27,15 +27,22 @@ export class CompletionEngine {
     const temperature = cfg.get<number>('completionTemperature') ?? 0.0;
     const maxTokens = cfg.get<number>('completionMaxTokens') ?? 256;
 
-    switch (provider) {
+    // Detect DeepSeek by baseURL even when provider is set to 'anthropic'
+    // (user configured DeepSeek as an Anthropic-compatible endpoint)
+    const effectiveProvider = (baseURL || '').toLowerCase().includes('deepseek.com')
+      ? 'deepseek'
+      : provider;
+
+    switch (effectiveProvider) {
       case 'ollama':
         return this.generateOllamaFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
-      case 'openai':
-        return this.generateChatFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
       case 'deepseek':
         return this.generateDeepSeekFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
+      case 'openai':
+      case 'google':
+      case 'azure-openai':
       default:
-        // Anthropic and other providers use chat-based FIM
+        // Anthropic, OpenAI, Google, Azure and other providers use chat-based FIM
         return this.generateChatFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
     }
   }

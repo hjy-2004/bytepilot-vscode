@@ -1,6 +1,5 @@
 import type { LanguageModelV1 } from 'ai';
-import type { ProviderConfig, ProviderId } from '../types/ai';
-import { PROVIDER_DEFAULTS } from '../types/ai';
+import type { ProviderConfig } from '../types/ai';
 
 /**
  * Selects the appropriate model for a given task type.

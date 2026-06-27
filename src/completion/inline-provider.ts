@@ -58,8 +58,13 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
 
     const isManual = context.triggerKind === vscode.InlineCompletionTriggerKind.Explicit;
 
-    if (!isManual && this.debouncer.shouldDebounce(document, position)) {
-      return [];
+    // Debounce: wait for typing to pause, or cancel on next keystroke
+    if (!isManual) {
+      try {
+        await this.debouncer.schedule(document);
+      } catch {
+        return []; // cancelled by a newer keystroke
+      }
     }
 
     const ctx = this.ctxBuilder.build(document, position);
@@ -67,7 +72,6 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
 
     logInfo(`Completion triggered: ${ctx.language}, prefix=${ctx.prefix.length} chars, manual=${isManual}`);
 
-    const prompt = this.ctxBuilder.formatPrompt(ctx.prefix, ctx.suffix, ctx.language);
     const abortController = new AbortController();
     token.onCancellationRequested(() => abortController.abort());
 

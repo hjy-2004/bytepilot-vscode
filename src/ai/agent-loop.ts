@@ -1,5 +1,5 @@
 import type { Message } from './message-types';
-import type { ApiConfig, ToolDef, StreamResult } from './api-client';
+import type { ApiConfig, ToolDef } from './api-client';
 import { streamChat } from './api-client';
 import { logInfo, logError } from '../utils/logger';
 import { logAiRequestStart, logAiCompletion, logAiError, logToolCallStart, logToolCallResult } from '../utils/ai-logger';
@@ -13,6 +13,8 @@ export interface AgentCallbacks {
   getDisplayName: (name: string) => string;
   executeTool: (name: string, args: Record<string, unknown>) => Promise<{ result: string; success: boolean }>;
   isReadOnly: (name: string) => boolean;
+  /** Called after each tool result is added to history, for incremental persistence */
+  onHistoryChanged?: () => void;
 }
 
 export async function runAgentLoop(
@@ -101,6 +103,7 @@ export async function runAgentLoop(
         if (!approved) {
           history.push({ role: 'tool', toolCallId: tc.id, content: 'Error: Tool execution was rejected by user.' });
           cb.onToolResult(tc.id, tc.name, 'Error: Tool execution was rejected by user.', false);
+          cb.onHistoryChanged?.();
           logInfo(`[AgentLoop] User rejected ${tc.name} — injecting denial as tool_result`);
           continue;
         }
@@ -112,11 +115,13 @@ export async function runAgentLoop(
           logToolCallResult(tc.id, tc.name, r.success, r.result, Date.now() - t0);
           history.push({ role: 'tool', toolCallId: tc.id, content: r.result });
           cb.onToolResult(tc.id, tc.name, r.result, r.success);
+          cb.onHistoryChanged?.();
         } catch (err: any) {
           const msg = `Error: ${err.message}`;
           logToolCallResult(tc.id, tc.name, false, msg, Date.now() - t0);
           history.push({ role: 'tool', toolCallId: tc.id, content: msg });
           cb.onToolResult(tc.id, tc.name, msg, false);
+          cb.onHistoryChanged?.();
         }
       }
     }
