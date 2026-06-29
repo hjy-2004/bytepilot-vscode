@@ -2,26 +2,29 @@
 
 [English](https://github.com/hjy-2004/bytepilot-vscode/blob/master/README_EN.md)
 
-类 Cursor 的 AI 编程助手，完全运行在 VS Code 中。支持多 AI 提供商、内联代码补全、文件编辑、终端命令、可视化 diff 审批、多会话管理。
+类 Cursor 的 AI 编程助手，完全运行在 VS Code 中。支持 60+ AI 供应商预设（来自 cc-switch）、内联代码补全、文件编辑、终端命令、可视化 diff 审批、多会话管理。
 
 ## 功能
 
 - **Chat** — 侧边栏 AI 对话，流式响应，AI 自主决定何时停止
-- **Inline Completion** — 输入停顿自动触发灰色补全，Tab 接受（延迟调度，不再丢弃请求）
-- **Visual Diff & Approval** — 文件编辑前显示可视化 diff，内联审批（Approve/Reject），不再弹窗
-- **File Editing** — 精准 `old_string → new_string` 替换，不重写整个文件
+- **Inline Completion** — 输入停顿自动触发灰色补全，Tab 接受
+- **Visual Diff & Approval** — 文件编辑前显示可视化 diff，内联审批（Approve/Reject）
+- **File Editing** — 精准 `old_string → new_string` 替换（Claude Code 风格）
 - **Tool System** — 8 个内置工具：read / write / edit / search / list / command / diagnostics / diff
-- **Multi-Provider** — 完整支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama，自动格式路由
+- **Multi-Provider** — 60+ 供应商预设，完整支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama，以及 Kimi / 智谱 / MiniMax / 阶跃星辰 / 火山方舟 / OpenRouter / SiliconFlow 等
+- **Provider Categories** — 供应商按 5 大分类展示（官方 / 国产官方 / 聚合商 / 第三方 / 云服务商）
+- **Model Fetching** — 点击 🔄 一键从供应商 API 拉取实时模型列表（支持 OpenAI 和 Gemini 格式）
+- **Per-Provider API Key** — 每个供应商独立存储 API key，切换供应商自动匹配，互不覆盖
 - **Slash Commands `/`** — 输入 `/` 弹出命令菜单（`/clear` `/config` `/sessions` `/rules` `/help`）
 - **Input History** — 聊天输入框按 `↑`/`↓` 键浏览历史消息（最多 50 条）
-- **Image Paste & Upload** — 聊天输入框粘贴图片或点击按钮本地上传，支持视觉模型识图
+- **Image Paste & Upload** — 聊天输入框粘贴图片或点击按钮本地上传
 - **Semantic Search** — BM25 代码搜索引擎，`search_files` 支持 `semantic: true` 相关性排序
 - **Project Rules** — 工作区根目录放置 `.bytepilotrules` 文件，自动注入 AI system prompt
 - **Auto Config** — 首次启动自动读取 `.claude/settings.json`，零配置
 - **Multi-Session** — JSONL 持久化，创建/切换/删除会话，工具调用和 diff 数据完整恢复
 - **Incremental Saving** — 每条工具结果即时写入磁盘，崩溃不丢数据
 - **Model Settings** — 点击标题栏模型标签，可视化切换 Provider / Model / Base URL / API Key
-- **Silent Command** — 命令静默执行，不再弹终端窗口
+- **Smart API Routing** — 自动检测 API 协议（Anthropic / OpenAI / Google / OpenAI 兼容），16 条 URL 匹配规则
 - **Structured Logging** — 统一 BytePilot 输出频道，记录 AI 请求/工具调用/API 详情/会话诊断
 - **@file References** — 输入 `@文件名` 自动搜索工作区文件，选中后附带文件内容作为上下文
 
@@ -62,7 +65,7 @@ npx vsce package
 
 | 设置 | 默认 | 说明 |
 |------|------|------|
-| `aiCodingAgent.provider` | `anthropic` | 厂商（anthropic/openai/deepseek/google/azure-openai/ollama） |
+| `aiCodingAgent.provider` | `anthropic` | 厂商（anthropic/openai/deepseek/google/azure-openai/ollama/openai-compatible） |
 | `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | 对话模型 |
 | `aiCodingAgent.completionModel` | (空) | 补全模型（空=同对话） |
 | `aiCodingAgent.baseURL` | (空) | 自定义 API 地址 |
@@ -111,14 +114,14 @@ extension_plugin/
 ├── .github/workflows/      # CI/CD (lint, build, test, release)
 ├── src/                    # 扩展宿主 (TypeScript)
 │   ├── extension.ts        # 入口
-│   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, stream-bridge）
+│   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, model-fetcher）
 │   ├── tools/              # 8 个工具（含 diff_file, execute_command 静默模式）
-│   ├── chat/               # 聊天面板、路由、JSONL 历史持久化（增量保存 + SHA-256）
+│   ├── chat/               # 聊天面板、路由、JSONL 历史持久化
 │   ├── context/            # 上下文收集器（.bytepilotrules + BM25 语义搜索）
-│   ├── completion/         # InlineCompletionItemProvider (多 provider FIM, 延迟调度)
-│   ├── config/             # 设置、校验、导入（6 厂商）
+│   ├── completion/         # InlineCompletionItemProvider (多 provider FIM)
+│   ├── config/             # 设置、校验、导入、供应商预设（60+ 供应商）
 │   └── utils/              # ai-logger, diff-helper, token-counter
-├── webview-ui/             # React 聊天界面 (Vite + Zustand, / 命令 + 输入历史)
+├── webview-ui/             # React 聊天界面 (Vite + Zustand, / 命令 + 输入历史 + 模型获取)
 ├── eslint.config.mjs       # ESLint flat config
 └── esbuild.config.mjs      # 扩展构建
 ```
@@ -140,6 +143,8 @@ extension_plugin/
 
 ## 支持的厂商
 
+### 官方
+
 | 厂商 | 对话 | 补全 | 工具 | 说明 |
 |------|------|------|------|------|
 | Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | 原生 API + prompt caching + extended thinking |
@@ -148,6 +153,30 @@ extension_plugin/
 | Google (Gemini) | ✅ | ✅ (chat FIM) | ✅ | 通过 `@ai-sdk/google` |
 | Azure OpenAI | ✅ | ✅ (chat FIM) | ✅ | 自定义 resource + deployment |
 | Ollama | ✅ | ✅ (FIM) | ✅ | 本地 LLM，/api/chat 原生格式 |
+
+### 国产官方 & 聚合商（内置预设，来自 cc-switch）
+
+| 供应商 | 说明 |
+|--------|------|
+| Kimi (Moonshot) | `api.moonshot.cn/v1`，kimi-k2.7-code |
+| Kimi For Coding | `api.kimi.com/coding`，Anthropic 兼容端点 |
+| 智谱 GLM | `open.bigmodel.cn` / `api.z.ai`，glm-5.1 |
+| MiniMax | `api.minimaxi.com/v1` / `api.minimax.io/v1` |
+| 阶跃星辰 (StepFun) | `api.stepfun.com/step_plan/v1` |
+| 火山方舟 AgentPlan | `ark.cn-beijing.volces.com/api/coding/v3` |
+| 豆包 Seed | `ark.cn-beijing.volces.com/api/v3` |
+| 百炼 (阿里) | `dashscope.aliyuncs.com/compatible-mode/v1` |
+| 百度千帆 | `qianfan.baidubce.com/anthropic/coding` |
+| 小米 MiMo | `api.xiaomimimo.com/v1` |
+| OpenRouter | 聚合商，多模型路由 |
+| SiliconFlow | 国产聚合商 |
+| 省算云 / AiHubMix / CherryIN 等 | 社区供应商 |
+
+完整列表见 ModelSelector 下拉菜单（共 21 个）。
+
+### 自动 API 格式检测
+
+插件根据 baseURL 自动判断 API 协议（Anthropic Messages / OpenAI Chat / Google Gemini / OpenAI 兼容），无需手动配置。支持 9 种常见 URL 兼容后缀的自动剥离（`/anthropic`、`/api/anthropic`、`/apps/anthropic`、`/api/coding`、`/api/claudecode`、`/step_plan`、`/claude`、`/coding`）。
 
 ## License
 
