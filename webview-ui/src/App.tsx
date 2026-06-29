@@ -28,6 +28,8 @@ const App: React.FC = () => {
   const [scanDone, setScanDone] = useState(false);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [fetchedModels, setFetchedModels] = useState<{ id: string; name: string }[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
 
   const handleExtensionMessage = useCallback((msg: ExtensionMessage) => {
     const store = useChatStore.getState();
@@ -51,6 +53,11 @@ const App: React.FC = () => {
         store.addErrorMessage(`Error: ${msg.payload.message}`);
         break;
       case 'config.state':
+        // Clear fetched models when provider changes, so stale models from
+        // the old provider aren't shown before the user re-fetches.
+        if (msg.payload.provider !== store.config?.provider) {
+          setFetchedModels([]);
+        }
         store.setConfig(msg.payload);
         break;
       case 'config.found':
@@ -69,6 +76,10 @@ const App: React.FC = () => {
         break;
       case 'chat.state':
         store.restoreMessages(msg.payload.messages);
+        break;
+      case 'models.list':
+        setFetchedModels(msg.payload.models);
+        setIsFetchingModels(false);
         break;
       case 'session.list':
         setSessions(msg.payload.sessions);
@@ -134,8 +145,17 @@ const App: React.FC = () => {
     postMessage({ type: 'config.set', payload: { chatModel: model } } as any);
   }, [postMessage]);
 
-  const handleChangeSettings = useCallback((settings: { provider?: string; chatModel?: string; baseURL?: string; apiKey?: string }) => {
+  const handleChangeSettings = useCallback((settings: { provider?: string; chatModel?: string; baseURL?: string }) => {
     postMessage({ type: 'config.set', payload: settings } as any);
+  }, [postMessage]);
+
+  const handleSetKey = useCallback((providerId: string, apiKey: string) => {
+    postMessage({ type: 'config.setKey', payload: { providerId, apiKey } } as any);
+  }, [postMessage]);
+
+  const handleFetchModels = useCallback(() => {
+    setIsFetchingModels(true);
+    postMessage({ type: 'models.fetch' } as any);
   }, [postMessage]);
 
   const isConfigured = !!(config?.initialized);
@@ -209,6 +229,10 @@ const App: React.FC = () => {
           }}
           onChangeModel={handleChangeModel}
           onChangeSettings={handleChangeSettings}
+          onSetKey={handleSetKey}
+          onFetchModels={handleFetchModels}
+          fetchedModels={fetchedModels}
+          isFetchingModels={isFetchingModels}
           sessions={sessions}
           activeSessionId={activeSessionId}
           onNewSession={handleNewSession}

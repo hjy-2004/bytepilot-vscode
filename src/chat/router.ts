@@ -7,6 +7,8 @@ import { getConfigState } from '../config/settings';
 import { scanKnownLocations } from '../config/importer';
 import { listSessions, createSession as createSessionFile, deleteSession as deleteSessionFile, loadSessionMessages, loadSessionDiffs } from './history';
 import { logInfo, logError } from '../utils/logger';
+import { fetchModelsForCurrentProvider } from '../ai/model-fetcher';
+import { SecretsStore } from '../ai/secrets-store';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
 import type { Message } from '../ai/message-types';
 
@@ -28,6 +30,9 @@ export class MessageRouter implements vscode.Disposable {
   private workspacePath: string = '';
   private onSessionSwitch?: (sessionId: string) => void;
 
+  private getCredentials?: () => { baseURL: string; apiKey: string };
+  private secretsStore?: SecretsStore;
+
   constructor(
     private readonly toolRegistry: ToolRegistry,
     private readonly onImportRequest?: () => Promise<void>,
@@ -35,6 +40,14 @@ export class MessageRouter implements vscode.Disposable {
     private readonly onImportCached?: (sourcePath: string) => Promise<void>,
     private readonly createEngineFn?: () => ChatEngine | null,
   ) {}
+
+  setSecretsStore(secretsStore: SecretsStore): void {
+    this.secretsStore = secretsStore;
+  }
+
+  setCredentialsProvider(fn: () => { baseURL: string; apiKey: string }): void {
+    this.getCredentials = fn;
+  }
 
   setWorkspacePath(wsPath: string): void {
     this.workspacePath = wsPath;
@@ -224,16 +237,51 @@ export class MessageRouter implements vscode.Disposable {
         break;
       }
 
+      case 'config.setKey': {
+        const { providerId, apiKey } = (message as any).payload || {};
+        if (providerId && apiKey && this.secretsStore) {
+          await this.secretsStore.setApiKey(providerId, apiKey);
+          logInfo(`API key stored for provider: ${providerId}`);
+        }
+        break;
+      }
+
       case 'config.set': {
         const { provider, chatModel, completionModel, baseURL } = (message as any).payload || {};
         const cfg = vscode.workspace.getConfiguration('aiCodingAgent');
         if (provider) await cfg.update('provider', provider, vscode.ConfigurationTarget.Global);
         if (chatModel) await cfg.update('chatModel', chatModel, vscode.ConfigurationTarget.Global);
         if (completionModel !== undefined) await cfg.update('completionModel', completionModel, vscode.ConfigurationTarget.Global);
-        if (baseURL !== undefined) await cfg.update('baseURL', baseURL, vscode.ConfigurationTarget.Global);
+        if (baseURL !== undefined) {
+          // Use undefined to clear the key when baseURL is empty, so fallback
+          // logic in ProviderManager.readClaudeConfigKey doesn't re-import it.
+          await cfg.update('baseURL', baseURL || undefined, vscode.ConfigurationTarget.Global);
+        }
         // NOTE: apiKey is intentionally NOT accepted from WebView for security.
         // API keys can only be set via the "Configure AI Provider" command (uses SecretStorage).
         setTimeout(() => reply({ type: 'config.state', payload: getConfigState() }), 500);
+        break;
+      }
+
+      case 'models.fetch': {
+        try {
+          const creds = this.getCredentials?.();
+          if (!creds) {
+            reply({ type: 'models.list', payload: { models: [] } });
+            break;
+          }
+          const result = await fetchModelsForCurrentProvider(creds.baseURL, creds.apiKey);
+          reply({
+            type: 'models.list',
+            payload: {
+              models: result?.models || [],
+              sourceUrl: result?.url,
+            },
+          });
+        } catch (err: any) {
+          logError('Model fetch failed', err);
+          reply({ type: 'models.list', payload: { models: [] } });
+        }
         break;
       }
 

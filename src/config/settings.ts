@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { ProviderId, ProviderConfig, ModelInfo } from '../types/ai';
 import { PROVIDER_DEFAULTS, KNOWN_MODELS } from '../types/ai';
 import { getDisplayProvider } from './importer';
+import { findPresetByURL, getModelsForProvider } from './provider-presets';
 
 const CONFIG_SECTION = 'aiCodingAgent';
 
@@ -12,10 +13,10 @@ export function readConfig(): ProviderConfig {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 
   const provider = (config.get<string>('provider') || 'anthropic') as ProviderId;
-  const defaults = PROVIDER_DEFAULTS[provider];
+  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS['anthropic'];
 
-  const chatModel = config.get<string>('chatModel') || defaults.chatModel;
-  const completionModel = config.get<string>('completionModel') || chatModel;
+  const chatModel = cleanModelName(config.get<string>('chatModel') || defaults.chatModel);
+  const completionModel = cleanModelName(config.get<string>('completionModel') || chatModel);
   const baseURL = config.get<string>('baseURL') || undefined;
   const temperature = config.get<number>('temperature') ?? 0.7;
   const maxTokens = config.get<number>('maxTokens') ?? 4096;
@@ -29,11 +30,25 @@ export function readConfig(): ProviderConfig {
   };
 }
 
+/** Strip suffixes like [1m] from model names (DeepSeek notation for 1M context). */
+function cleanModelName(name: string): string {
+  return name.replace(/\[.*\]$/, '').trim();
+}
+
 /**
  * Returns the list of known models for the active provider.
+ * First checks the presets, falls back to base KNOWN_MODELS.
  */
-export function getAvailableModels(provider: ProviderId): ModelInfo[] {
-  return KNOWN_MODELS[provider] || [];
+export function getAvailableModels(provider: string): ModelInfo[] {
+  // Try preset lookup first
+  const presetModels = getModelsForProvider(provider);
+  if (presetModels.length > 0) return presetModels;
+
+  // Try base provider lookup
+  const baseModels = KNOWN_MODELS[provider];
+  if (baseModels && baseModels.length > 0) return baseModels;
+
+  return [];
 }
 
 /**
@@ -48,6 +63,8 @@ export function getConfigState(): {
   completionsEnabled: boolean;
   availableModels: ModelInfo[];
   initialized: boolean;
+  displayProvider?: string;
+  baseURL?: string;
 } {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
   const provider = (config.get<string>('provider') || 'anthropic') as ProviderId;
@@ -57,8 +74,18 @@ export function getConfigState(): {
   const initialized = !!(inspection?.globalValue || inspection?.workspaceValue);
 
   const baseURL = config.get<string>('baseURL') || undefined;
-  const chatModel = config.get<string>('chatModel') || PROVIDER_DEFAULTS[provider].chatModel;
+  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS['anthropic'];
+  const chatModel = cleanModelName(config.get<string>('chatModel') || defaults.chatModel);
   const displayProvider = getDisplayProvider(provider, baseURL, chatModel);
+
+  // Enrich available models with preset models when a matching baseURL is found
+  let availableModels = getAvailableModels(provider);
+  if (baseURL && availableModels.length === 0) {
+    const preset = findPresetByURL(baseURL);
+    if (preset) {
+      availableModels = preset.models;
+    }
+  }
 
   return {
     provider,
@@ -68,7 +95,7 @@ export function getConfigState(): {
     temperature: config.get<number>('temperature') ?? 0.7,
     maxTokens: config.get<number>('maxTokens') ?? 4096,
     completionsEnabled: config.get<boolean>('completionsEnabled') ?? true,
-    availableModels: getAvailableModels(provider),
+    availableModels,
     initialized,
     displayProvider,
     baseURL,

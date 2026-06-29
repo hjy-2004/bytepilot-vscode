@@ -69,8 +69,17 @@ export interface ConfigImportSpecificMessage {
   };
 }
 
+export interface ConfigSetKeyMessage {
+  type: 'config.setKey';
+  payload: { providerId: string; apiKey: string };
+}
+
 export interface ConfigManualSetupMessage {
   type: 'config.manualSetup';
+}
+
+export interface ModelsFetchMessage {
+  type: 'models.fetch';
 }
 
 export interface FilesSearchMessage {
@@ -91,6 +100,8 @@ export type WebViewMessage =
   | ConfigScanMessage
   | ConfigImportSpecificMessage
   | ConfigManualSetupMessage
+  | ConfigSetKeyMessage
+  | ModelsFetchMessage
   | ChatRestoreMessage
   | SessionRequestMessage;
 
@@ -234,6 +245,11 @@ export interface ChatClearMessage {
   type: 'chat.clear';
 }
 
+export interface ModelsListMessage {
+  type: 'models.list';
+  payload: { models: Array<{ id: string; name: string }>; sourceUrl?: string };
+}
+
 export interface FilesSearchResultMessage {
   type: 'files.searchResult';
   payload: { files: Array<{ path: string; name: string }> };
@@ -251,5 +267,6 @@ export type ExtensionMessage =
   | ToolRequestApprovalMessage
   | ChatClearMessage
   | ConfigFoundMessage
+  | ModelsListMessage
   | ChatStateMessage
   | SessionListMessage;

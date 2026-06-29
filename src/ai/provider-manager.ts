@@ -23,13 +23,9 @@ export class ProviderManager implements vscode.Disposable {
   private initialized = false;
 
   constructor(private readonly secretsStore: SecretsStore) {
-    this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(async (e) => {
-        if (e.affectsConfiguration('aiCodingAgent')) {
-          await this.reload();
-        }
-      })
-    );
+    // NOTE: onDidChangeConfiguration is handled by extension.ts, which awaits
+    // reload() before recreating ChatEngine/CompletionEngine to avoid a race
+    // condition where engines get the old model.
 
     this.disposables.push(
       secretsStore.onDidChange(async () => {
@@ -47,7 +43,16 @@ export class ProviderManager implements vscode.Disposable {
   async reload(): Promise<void> {
     try {
       const settingsConfig = readConfig();
-      let apiKey = await this.secretsStore.getApiKey(settingsConfig.provider);
+      let apiKey: string | undefined;
+
+      // Try the effective provider first (inferred from baseURL, e.g. 'kimi', 'zhipu'),
+      // then fall back to the raw provider ID (e.g. 'openai-compatible', 'anthropic').
+      // This allows per-provider API keys when multiple services share the same protocol.
+      const effectiveProvider = inferEffectiveProvider(settingsConfig.baseURL || '', settingsConfig.provider);
+      apiKey = await this.secretsStore.getApiKey(effectiveProvider);
+      if (!apiKey) {
+        apiKey = await this.secretsStore.getApiKey(settingsConfig.provider);
+      }
 
       // Fallback: if no key in secrets, try reading directly from Claude Code config
       if (!apiKey) {
@@ -118,9 +123,10 @@ export class ProviderManager implements vscode.Disposable {
 
       if (key) {
         const vscConfig = vscode.workspace.getConfiguration('aiCodingAgent');
-        // Auto-apply baseURL and model if not already set
-        const hasBaseURL = !!vscConfig.inspect('baseURL')?.globalValue;
-        const hasModel = !!vscConfig.inspect('chatModel')?.globalValue;
+        // Auto-apply baseURL and model if not already set.
+        // Use !== undefined (not !!) so that empty string counts as "already set".
+        const hasBaseURL = vscConfig.inspect('baseURL')?.globalValue !== undefined;
+        const hasModel = vscConfig.inspect('chatModel')?.globalValue !== undefined;
         if (!hasBaseURL && env.ANTHROPIC_BASE_URL) {
           vscConfig.update('baseURL', env.ANTHROPIC_BASE_URL, vscode.ConfigurationTarget.Global);
         }
@@ -128,7 +134,7 @@ export class ProviderManager implements vscode.Disposable {
           vscConfig.update('chatModel', env.ANTHROPIC_MODEL, vscode.ConfigurationTarget.Global);
         }
         // Auto-set provider if not configured
-        if (!vscConfig.inspect('provider')?.globalValue) {
+        if (vscConfig.inspect('provider')?.globalValue === undefined) {
           vscConfig.update('provider', 'anthropic', vscode.ConfigurationTarget.Global);
         }
       }
@@ -143,4 +149,28 @@ export class ProviderManager implements vscode.Disposable {
     vscode.Disposable.from(...this.disposables).dispose();
     this.disposables = [];
   }
+}
+
+/**
+ * Infer the effective provider ID from baseURL, matching the same heuristics
+ * used by ModelSelector to display the correct model list and per-provider API keys.
+ */
+function inferEffectiveProvider(baseURL: string, rawProvider: string): string {
+  const url = baseURL.toLowerCase();
+  if (url.includes('deepseek.com')) return 'deepseek';
+  if (url.includes('moonshot.cn')) return 'kimi';
+  if (url.includes('bigmodel.cn') || url.includes('api.z.ai')) return 'zhipu';
+  if (url.includes('minimaxi.com') || url.includes('minimax.io')) return 'minimax';
+  if (url.includes('stepfun.com') || url.includes('stepfun.ai')) return 'stepfun';
+  if (url.includes('dashscope.aliyuncs.com')) return 'bailian';
+  if (url.includes('qianfan.baidubce.com')) return 'baidu-qianfan';
+  if (url.includes('volces.com')) return 'volcano';
+  if (url.includes('xiaomimimo.com')) return 'xiaomi-mimo';
+  if (url.includes('longcat.chat')) return 'longcat';
+  if (url.includes('openrouter.ai')) return 'openrouter';
+  if (url.includes('siliconflow.cn') || url.includes('siliconflow.com')) return 'siliconflow';
+  if (url.includes('aihubmix.com')) return 'aihubmix';
+  if (url.includes('cherryin.net')) return 'cherryin';
+  if (url.includes('shengsuanyun.com')) return 'shengsuanyun';
+  return rawProvider;
 }

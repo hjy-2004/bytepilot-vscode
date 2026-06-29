@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { LanguageModelV1 } from 'ai';
 import { logInfo } from '../utils/logger';
+import { detectApiFormat } from '../config/provider-presets';
 
 /**
  * Completion engine supporting multiple providers for code completions.
@@ -27,24 +28,22 @@ export class CompletionEngine {
     const temperature = cfg.get<number>('completionTemperature') ?? 0.0;
     const maxTokens = cfg.get<number>('completionMaxTokens') ?? 256;
 
-    // Detect DeepSeek by baseURL even when provider is set to 'anthropic'
-    // (user configured DeepSeek as an Anthropic-compatible endpoint)
-    const effectiveProvider = (baseURL || '').toLowerCase().includes('deepseek.com')
-      ? 'deepseek'
-      : provider;
+    // Use smart detection: baseURL + provider context determines the effective provider
+    const url = (baseURL || '').toLowerCase();
+    const isDeepSeek = url.includes('deepseek.com') || provider === 'deepseek';
+    const isOllama = provider === 'ollama';
+    const apiFormat = detectApiFormat(provider, baseURL);
 
-    switch (effectiveProvider) {
-      case 'ollama':
-        return this.generateOllamaFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
-      case 'deepseek':
-        return this.generateDeepSeekFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
-      case 'openai':
-      case 'google':
-      case 'azure-openai':
-      default:
-        // Anthropic, OpenAI, Google, Azure and other providers use chat-based FIM
-        return this.generateChatFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
+    // Native FIM: DeepSeek and Ollama have dedicated FIM endpoints
+    if (isOllama) {
+      return this.generateOllamaFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
     }
+    if (isDeepSeek) {
+      return this.generateDeepSeekFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
+    }
+
+    // All others (openai, anthropic, google, azure, openai-compatible, aggregators) use chat-based FIM
+    return this.generateChatFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);
   }
 
   /** DeepSeek native FIM: POST /beta/completions */

@@ -4,6 +4,34 @@ All notable changes to BytePilot will be documented in this file.
 
 ---
 
+## [0.5.0] - 2026-06-29
+
+### Added
+- **Provider knowledge base (cc-switch integration)**: 60+ provider presets with base URLs, default models, API formats, categories, and icon mappings sourced from cc-switch.
+- **Categorized provider picker**: 21 providers across 5 categories (Official, Chinese Official, Aggregator, Third-Party, Cloud) in both the Configure AI Provider command and ModelSelector UI.
+- **Model list fetching**: Click 🔄 in ModelSelector to fetch live model lists from provider APIs via `GET /v1/models` (OpenAI-compatible) or Gemini's `models.list` endpoint with smart URL candidate generation.
+- **Per-provider API keys**: API keys are now stored per effective provider (e.g. `deepseek`, `kimi`, `zhipu`) in SecretStorage. Switching providers auto-matches the correct key. Custom tab API key input now works via `config.setKey` IPC.
+- **Smart API format detection**: Auto-detects Anthropic/OpenAI/Google/OpenAI-compatible protocols from baseURL patterns (16 URL matching rules from cc-switch).
+- **Known compat suffixes**: Strips `/anthropic`, `/api/anthropic`, `/apps/anthropic`, `/api/coding`, `/api/claudecode`, `/step_plan`, `/claude`, `/coding` suffixes for model-fetch URL construction.
+- **Gemini native streaming**: `streamChatGeminiNative()` for providers using Gemini generateContent API (POST `/v1beta/models/{model}:streamGenerateContent`).
+- **Provider icon mappings**: 30 provider icons with brand colors (Anthropic #D4915D, OpenAI #00A67E, Google #4285F4, DeepSeek #1E88E5, etc.).
+- **Model catalog**: Detailed model info with context limits, output limits, and modalities for Claude, OpenAI, Gemini, DeepSeek, Kimi, Zhipu, MiniMax, StepFun, Volcano, MiMo, Bedrock families.
+
+### Fixed
+- **Provider switch race condition**: `createChatEngine()` now awaits `providerManager.reload()` before reading the new model, preventing old models from being used after a switch.
+- **BaseURL not clearing on provider switch**: `readClaudeConfigKey` now uses `!== undefined` instead of `!!` to distinguish empty-string (explicitly cleared) from unset. Empty baseURL is written as `undefined` to properly delete the config key.
+- **`[1m]` suffix cleanup**: Model names are now cleaned (`deepseek-v4-pro[1m]` → `deepseek-v4-pro`) when reading from config and before sending to APIs.
+- **Effective provider inference**: ModelSelector and ProviderManager now infer the actual provider from baseURL (e.g. `deepseek.com/anthropic` → provider DeepSeek), showing the correct model list and using the right API key slot.
+- **Outdated models removed**: `deepseek-v3`, `deepseek-r1`, `deepseek-v4-pro[1m]` removed from built-in model lists to match current DeepSeek API (v4-pro, v4-flash only).
+
+### Changed
+- **ModelSelector UI**: Complete rewrite — shows 21 providers grouped by 5 categories with search filter, per-category provider chips, fetched model counts, and provider-aware model lists.
+- **Provider defaults**: All 6 base providers now have explicit `defaultBaseURL` values (Anthropic `api.anthropic.com`, OpenAI `api.openai.com/v1`, Google `generativelanguage.googleapis.com`, DeepSeek `api.deepseek.com/v1`).
+- **Expanded provider enum**: `package.json` now lists all 7 provider IDs including `openai-compatible` as a generic catch-all.
+- **`PROVIDER_DEFAULTS` and `KNOWN_MODELS`**: Expanded from `Record<ProviderId, ...>` to `Record<string, ...>` with comprehensive model catalogs.
+
+---
+
 ## [0.4.0] - 2026-06-27
 
 ### Added

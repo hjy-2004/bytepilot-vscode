@@ -100,6 +100,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       } catch { return null; }
     }
   );
+  messageRouter.setSecretsStore(secretsStore);
+  messageRouter.setCredentialsProvider(() => {
+    const config = providerManager.getConfig();
+    return {
+      baseURL: config?.baseURL || '',
+      apiKey: config?.apiKey || '',
+    };
+  });
   disposables.add(messageRouter);
   messageRouter?.onSwitchSession((sessionId: string) => {
     if (chatEngine) {
@@ -112,14 +120,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // --- Chat Engine ---
   createChatEngine();
 
-  // Listen for provider changes to recreate chat engine
-  // NOTE: ProviderManager also has its own listener, so we await it via a small delay
-  // to ensure reload() completes before we read the new model.
+  // Listen for provider config changes to recreate engines.
+  // We await providerManager.reload() FIRST, then recreate ChatEngine and
+  // CompletionEngine so they always get the latest model.
   disposables.add(
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (e.affectsConfiguration('aiCodingAgent')) {
-        // Give ProviderManager's async reload a tick to complete
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await providerManager.reload();
         createChatEngine();
         updateCompletionEngine();
       }
@@ -236,34 +243,76 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
   disposables.add(
     vscode.commands.registerCommand('aiCodingAgent.configureProvider', async () => {
       const currentProvider = providerManager.getConfig()?.provider || 'anthropic';
-      const provider = await vscode.window.showQuickPick(
-        [
-          { label: 'Anthropic (Claude)', description: 'api.anthropic.com', value: 'anthropic' },
-          { label: 'OpenAI (GPT)', description: 'api.openai.com', value: 'openai' },
-          { label: 'DeepSeek', description: 'api.deepseek.com', value: 'deepseek' },
-          { label: 'Google (Gemini)', description: 'generativelanguage.googleapis.com', value: 'google' },
-          { label: 'Azure OpenAI', description: '{resource}.openai.azure.com', value: 'azure-openai' },
-          { label: 'Ollama (Local)', description: 'localhost:11434', value: 'ollama' },
-        ],
-        { placeHolder: `Current: ${currentProvider}. Select AI provider` }
-      );
-      if (!provider) return;
 
-      if (provider.value !== 'ollama') {
+      // Categorized provider list (from cc-switch knowledge base)
+      interface ProviderQPItem extends vscode.QuickPickItem {
+        value: string;
+        category: string;
+        defaultBaseURL?: string;
+        defaultModel?: string;
+      }
+
+      const allProviders: ProviderQPItem[] = [
+        // Official
+        { label: 'Anthropic (Claude)', description: 'api.anthropic.com', value: 'anthropic', category: 'Official' },
+        { label: 'OpenAI (GPT)', description: 'api.openai.com', value: 'openai', category: 'Official' },
+        { label: 'Google (Gemini)', description: 'generativelanguage.googleapis.com', value: 'google', category: 'Official' },
+        { label: 'Ollama (Local)', description: 'localhost:11434', value: 'ollama', category: 'Official', defaultModel: 'codellama' },
+        { label: 'Azure OpenAI', description: '{resource}.openai.azure.com', value: 'azure-openai', category: 'Official' },
+        // Chinese Official
+        { label: 'DeepSeek', description: 'api.deepseek.com', value: 'deepseek', category: 'Chinese Official', defaultBaseURL: 'https://api.deepseek.com/v1', defaultModel: 'deepseek-v4-pro' },
+        { label: 'Kimi (Moonshot)', description: 'api.moonshot.cn', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://api.moonshot.cn/v1', defaultModel: 'kimi-k2.7-code' },
+        { label: 'Zhipu GLM', description: 'open.bigmodel.cn', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://open.bigmodel.cn/api/coding/paas/v4', defaultModel: 'glm-5.1' },
+        { label: 'MiniMax', description: 'api.minimaxi.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://api.minimaxi.com/v1', defaultModel: 'MiniMax-M2.7' },
+        { label: 'StepFun', description: 'api.stepfun.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://api.stepfun.com/step_plan/v1', defaultModel: 'step-3.5-flash-2603' },
+        { label: 'Bailian (Alibaba)', description: 'dashscope.aliyuncs.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+        { label: 'Baidu Qianfan', description: 'qianfan.baidubce.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://qianfan.baidubce.com/anthropic/coding' },
+        { label: 'Volcano AgentPlan', description: 'ark.cn-beijing.volces.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://ark.cn-beijing.volces.com/api/coding/v3', defaultModel: 'ark-code-latest' },
+        { label: 'DouBao Seed', description: 'ark.cn-beijing.volces.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://ark.cn-beijing.volces.com/api/v3', defaultModel: 'doubao-seed-2-1-pro' },
+        { label: 'Xiaomi MiMo', description: 'api.xiaomimimo.com', value: 'openai-compatible', category: 'Chinese Official', defaultBaseURL: 'https://api.xiaomimimo.com/v1', defaultModel: 'mimo-v2.5-pro' },
+        // Aggregators
+        { label: 'OpenRouter', description: 'openrouter.ai', value: 'openai-compatible', category: 'Aggregator', defaultBaseURL: 'https://openrouter.ai/api/v1', defaultModel: 'anthropic/claude-sonnet-4.6' },
+        { label: 'SiliconFlow', description: 'api.siliconflow.cn', value: 'openai-compatible', category: 'Aggregator', defaultBaseURL: 'https://api.siliconflow.cn/v1' },
+        { label: 'AiHubMix', description: 'aihubmix.com', value: 'openai-compatible', category: 'Aggregator', defaultBaseURL: 'https://aihubmix.com' },
+        { label: 'CherryIN', description: 'open.cherryin.net', value: 'openai-compatible', category: 'Aggregator', defaultBaseURL: 'https://open.cherryin.net' },
+        { label: 'Shengsuanyun', description: 'router.shengsuanyun.com', value: 'openai-compatible', category: 'Aggregator', defaultBaseURL: 'https://router.shengsuanyun.com/api/v1' },
+        // Generic
+        { label: 'OpenAI Compatible (Generic)', description: 'Any OpenAI-compatible API', value: 'openai-compatible', category: 'Generic' },
+      ];
+
+      const selection = await vscode.window.showQuickPick(allProviders, {
+        placeHolder: `Current: ${currentProvider}. Select AI provider`,
+        matchOnDescription: true,
+        matchOnDetail: true,
+      });
+      if (!selection) return;
+
+      const providerValue = selection.value;
+
+      if (providerValue !== 'ollama') {
         const key = await vscode.window.showInputBox({
-          prompt: `Enter your ${provider.label} API key (leave blank to keep existing)`,
+          prompt: `Enter your ${selection.label} API key (leave blank to keep existing)`,
           password: true,
           placeHolder: 'sk-... or ant-...',
         });
         if (key !== undefined && key !== '') {
-          await secretsStore.setApiKey(provider.value as any, key);
+          await secretsStore.setApiKey(providerValue as any, key);
         }
       }
 
-      await vscode.workspace.getConfiguration('aiCodingAgent')
-        .update('provider', provider.value, vscode.ConfigurationTarget.Global);
+      const cfg = vscode.workspace.getConfiguration('aiCodingAgent');
+      await cfg.update('provider', providerValue, vscode.ConfigurationTarget.Global);
+
+      // Auto-fill baseURL and model when selecting a preset provider
+      if (selection.defaultBaseURL) {
+        await cfg.update('baseURL', selection.defaultBaseURL, vscode.ConfigurationTarget.Global);
+      }
+      if (selection.defaultModel) {
+        await cfg.update('chatModel', selection.defaultModel, vscode.ConfigurationTarget.Global);
+      }
+
       vscode.window.showInformationMessage(
-        `AI provider set to ${provider.label}. Configuration hot-reloaded.`
+        `AI provider set to ${selection.label}. Configuration hot-reloaded.`
       );
     })
   );

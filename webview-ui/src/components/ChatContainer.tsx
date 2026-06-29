@@ -23,7 +23,11 @@ interface ChatContainerProps {
   onCancel: () => void;
   onSetup: () => void;
   onChangeModel: (model: string) => void;
-  onChangeSettings: (settings: { provider?: string; chatModel?: string; baseURL?: string; apiKey?: string }) => void;
+  onChangeSettings: (settings: { provider?: string; chatModel?: string; baseURL?: string }) => void;
+  onSetKey?: (providerId: string, apiKey: string) => void;
+  onFetchModels?: () => void;
+  fetchedModels?: { id: string; name: string }[];
+  isFetchingModels?: boolean;
   sessions: SessionInfo[];
   activeSessionId: string | null;
   onNewSession: () => void;
@@ -42,6 +46,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   onSetup,
   onChangeModel,
   onChangeSettings,
+  onSetKey,
+  onFetchModels,
+  fetchedModels,
+  isFetchingModels,
   sessions,
   activeSessionId,
   onNewSession,
@@ -68,7 +76,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           onNew={onNewSession}
           onDelete={onDeleteSession}
         />
-        <ModelSelector config={config} onSetup={onSetup} onChangeModel={onChangeModel} onChangeSettings={onChangeSettings} />
+        <ModelSelector config={config} onSetup={onSetup} onChangeModel={onChangeModel} onChangeSettings={onChangeSettings} onSetKey={onSetKey} onFetchModels={onFetchModels} fetchedModels={fetchedModels} isFetchingModels={isFetchingModels} />
       </div>
 
       {/* Context bar */}

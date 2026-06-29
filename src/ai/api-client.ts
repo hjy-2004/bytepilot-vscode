@@ -55,15 +55,44 @@ export async function streamChat(
   signal?: AbortSignal,
 ): Promise<StreamResult> {
   const provider = config.provider || 'anthropic';
+
+  // If config has an explicit apiFormat field, route by format
+  const apiFormat = (config as any).apiFormat as string | undefined;
+  if (apiFormat === 'google') {
+    return streamChatGeminiNative(config, messages, tools, onToken, signal);
+  }
+  if (apiFormat === 'anthropic') {
+    // Force Anthropic protocol even if provider says otherwise
+    return streamChatAnthropic(config, messages, tools, onToken, signal);
+  }
+
+  // Auto-detect from provider and baseURL
+  const baseURL = (config.baseURL || '').toLowerCase();
+  const isGoogleNative = baseURL.includes('generativelanguage.googleapis.com') && !baseURL.includes('/v1');
+
+  if (isGoogleNative) {
+    return streamChatGeminiNative(config, messages, tools, onToken, signal);
+  }
+
+  // Check for Anthropic-compat path suffixes
+  const anthropicPathSuffixes = ['/anthropic', '/api/anthropic', '/apps/anthropic', '/api/coding', '/step_plan'];
+  const hasAnthropicSuffix = anthropicPathSuffixes.some(s => baseURL.endsWith(s) || baseURL.includes(s + '/'));
+
   switch (provider) {
     case 'openai':
     case 'deepseek':
     case 'google':
     case 'azure-openai':
+    case 'openai-compatible':
+      // If baseURL has Anthropic compat suffix AND model looks like a Claude model, use Anthropic protocol
+      if (hasAnthropicSuffix && (config.model.includes('claude') || config.model.includes('MiniMax'))) {
+        return streamChatAnthropic(config, messages, tools, onToken, signal);
+      }
       return streamChatOpenAI(config, messages, tools, onToken, signal);
     case 'ollama':
       return streamChatOllama(config, messages, tools, onToken, signal);
     default:
+      // Default: Anthropic protocol
       return streamChatAnthropic(config, messages, tools, onToken, signal);
   }
 }
@@ -481,6 +510,153 @@ async function streamChatOllama(
       }
     }
   } finally { reader.releaseLock(); }
+
+  return { text, toolCalls: calls, usage, stopReason };
+}
+
+// ── Gemini Native API (generateContent with SSE) ──
+
+function toGeminiContents(messages: Message[]): unknown[] {
+  const contents: unknown[] = [];
+  for (const m of messages) {
+    if (m.role === 'system') {
+      contents.push({ role: 'user', parts: [{ text: `[System]: ${m.content}` }] });
+      contents.push({ role: 'model', parts: [{ text: 'Understood.' }] });
+    } else if (m.role === 'user') {
+      const parts: unknown[] = [];
+      if (m.attachments?.length) {
+        for (const att of m.attachments) {
+          if (att.type === 'image' && att.content) {
+            const b64 = att.content.replace(/^data:image\/\w+;base64,/, '');
+            parts.push({ inline_data: { mime_type: att.mimeType || 'image/png', data: b64 } });
+          }
+        }
+      }
+      if (m.content) parts.push({ text: m.content });
+      contents.push({ role: 'user', parts });
+    } else if (m.role === 'assistant') {
+      const parts: unknown[] = [];
+      if (m.content) parts.push({ text: m.content });
+      if (m.toolCalls?.length) {
+        for (const tc of m.toolCalls) {
+          parts.push({ functionCall: { name: tc.name, args: tc.args } });
+        }
+      }
+      contents.push({ role: 'model', parts: parts.length ? parts : [{ text: '' }] });
+    } else if (m.role === 'tool') {
+      contents.push({
+        role: 'function',
+        parts: [{
+          functionResponse: { name: m.toolCallId || 'unknown', response: { result: m.content } },
+        }],
+      });
+    }
+  }
+  return contents;
+}
+
+function toGeminiTools(tools: ToolDef[]): unknown[] {
+  return tools.map(t => ({
+    functionDeclarations: [{
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    }],
+  }));
+}
+
+async function streamChatGeminiNative(
+  config: ApiConfig,
+  messages: Message[],
+  tools: ToolDef[],
+  onToken: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<StreamResult> {
+  const baseURL = config.baseURL || 'https://generativelanguage.googleapis.com';
+  const url = `${baseURL}/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+  const contents = toGeminiContents(messages);
+  const systemMsg = messages.find(m => m.role === 'system');
+  let text = '';
+  const calls: ToolCall[] = [];
+  let usage: { inputTokens: number; outputTokens: number } | undefined;
+  let stopReason: string | undefined;
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: { maxOutputTokens: config.maxTokens ?? 4096 },
+  };
+  if (systemMsg) {
+    body['systemInstruction'] = { parts: [{ text: systemMsg.content }] };
+  }
+  if (tools.length > 0) {
+    body['tools'] = toGeminiTools(tools);
+  }
+
+  const res = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Gemini API error ${res.status}: ${(await res.text().catch(() => '')).slice(0, 500)}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body');
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data: ')) continue;
+        try {
+          const j = JSON.parse(t.slice(6));
+          const candidate = j.candidates?.[0];
+          if (!candidate) continue;
+
+          if (candidate.content?.parts) {
+            for (const part of candidate.content.parts) {
+              if (part.text) {
+                text += part.text;
+                onToken(part.text);
+              }
+              if (part.functionCall) {
+                calls.push({
+                  id: part.functionCall.name + '_' + Math.random().toString(36).slice(2, 8),
+                  name: part.functionCall.name,
+                  args: part.functionCall.args || {},
+                });
+              }
+            }
+          }
+
+          if (candidate.finishReason) {
+            stopReason = candidate.finishReason === 'STOP' ? 'end_turn' :
+                         candidate.finishReason === 'MAX_TOKENS' ? 'max_tokens' :
+                         candidate.finishReason === 'TOOL_CALLS' ? 'tool_use' : 'end_turn';
+          }
+
+          if (j.usageMetadata) {
+            usage = {
+              inputTokens: j.usageMetadata.promptTokenCount || 0,
+              outputTokens: j.usageMetadata.candidatesTokenCount || 0,
+            };
+          }
+        } catch { /* skip malformed SSE lines */ }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 
   return { text, toolCalls: calls, usage, stopReason };
 }

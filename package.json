@@ -2,7 +2,7 @@
   "name": "bytepilot",
   "displayName": "BytePilot",
   "description": "Cursor-like AI coding assistant for VS Code",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "bytepilot",
   "repository": "https://github.com/hjy-2004/bytepilot-vscode",
   "engines": {
@@ -103,10 +103,14 @@
           "enum": [
             "openai",
             "anthropic",
-            "ollama"
+            "ollama",
+            "deepseek",
+            "google",
+            "azure-openai",
+            "openai-compatible"
           ],
           "default": "anthropic",
-          "description": "AI provider to use for chat and completions."
+          "description": "AI provider to use for chat and completions. 'openai-compatible' is a generic catch-all for providers with OpenAI-compatible APIs (OpenRouter, SiliconFlow, etc.)."
         },
         "aiCodingAgent.chatModel": {
           "type": "string",
