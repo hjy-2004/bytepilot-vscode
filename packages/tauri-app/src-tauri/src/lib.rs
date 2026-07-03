@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{fs::*, config::*, log::*, shell::*, workspace::*};
+use commands::{chat::*, config::*, fs::*, log::*, shell::*, workspace::*};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -41,6 +41,11 @@ pub fn run() {
             cmd_list_dir_workspace,
             cmd_search_content,
             cmd_pick_folder,
+            // Chat persistence
+            cmd_save_chat,
+            cmd_load_chat,
+            cmd_list_sessions,
+            cmd_delete_session,
             // Lifecycle
             cmd_get_workspace_root,
         ])

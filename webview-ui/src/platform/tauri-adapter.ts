@@ -65,6 +65,38 @@ let ac:AbortController|null=null;
 let wsRoot='';
 let projFiles:ProjEntry[]=[];
 let rules='';
+let sessionId='default';
+
+async function saveChat(){
+  if(!invoke)return;
+  try{
+    const msgs=hist.map(m=>({role:m.role,content:m.content,tool_calls:m.toolCalls||null,tool_call_id:m.toolCallId||null}));
+    await invoke('cmd_save_chat',{sessionId,messages:msgs});
+    console.log(`[Adapter] Chat saved: ${sessionId}, ${msgs.length} msgs`);
+    // Update session list
+    const sid=sessionId;
+    const ex=sessions.find(s=>s.id===sid);
+    if(ex){ex.messageCount=msgs.length;ex.updatedAt=Date.now();ex.title=msgs.find(m=>m.role==='user')?.content?.substring(0,30)||'New Chat'}
+    else{sessions.unshift({id:sid,title:msgs.find(m=>m.role==='user')?.content?.substring(0,30)||'New Chat',messageCount:msgs.length,updatedAt:Date.now()})}
+    if(h)h({type:'session.list',payload:{sessions}});
+  }catch(e){console.error('[Adapter] saveChat failed:',e)}
+}
+
+async function loadChat(){
+  if(!invoke)return;
+  try{
+    const data=await invoke('cmd_load_chat',{sessionId})as{messages:Array<{role:string;content:string;tool_calls?:any;tool_call_id?:string}>};
+    if(data.messages?.length>0){
+      hist=data.messages.map(m=>({role:m.role as Message['role'],content:m.content,toolCalls:m.tool_calls||undefined,toolCallId:m.tool_call_id||undefined}));
+      if(h)h({type:'chat.state',payload:{messages:hist.map(m=>({role:m.role,content:m.content}))}}as ExtensionMessage);
+    }
+  }catch(e){console.log('[Adapter] No saved chat to restore')}
+}
+
+async function listChatSessions(){
+  if(!invoke)return;
+  try{const ids=await invoke('cmd_list_sessions')as string[];sessions=ids.map(id=>({id,title:`Chat ${id.slice(0,8)}`,messageCount:0,updatedAt:Date.now()}));if(h)h({type:'session.list',payload:{sessions}})}catch{}
+}
 
 function sysPrompt():string{
   let p=`You are BytePilot, a desktop AI coding assistant. Use tools to read/write files and run commands. Be concise.\n\n## Workspace`;
@@ -155,9 +187,10 @@ export const tauriAdapter:IPlatformAdapter={
       case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=PRESETS[p.provider];cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.model||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.url||cfg.baseURL)}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;cfg.displayProvider=cfg.provider+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
       case'config.setKey':{const pk=(msg as any).payload||{};const ex=keys.find(k=>k.pid===pk.providerId);if(ex)ex.key=pk.apiKey;else keys.push({pid:pk.providerId,key:pk.apiKey});saveKey(pk.providerId,pk.apiKey);break;}
       case'models.fetch':(async()=>{const k=keys.find(x=>x.pid===cfg.provider)?.key||'';try{const r=await fetch(`${cfg.baseURL.replace(/\/+$/,'')}/models`,{headers:k?{Authorization:`Bearer ${k}`}:{},signal:AbortSignal.timeout(10000)});if(r.ok){const d=await r.json()as any;const list=(d.data||d.models||[]).map((m:any)=>({id:m.id||m.name?.replace('models/','')||'',name:m.name||m.id||''})).filter((m:any)=>m.id);if(h)h({type:'models.list',payload:{models:list,sourceUrl:cfg.baseURL}})}}catch{}})();break;
-      case'session.list':if(h)h({type:'session.list',payload:{sessions}});break;
-      case'session.create':{const id=`d-${Date.now()}`;sessions.push({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
-      case'session.delete':{const sid=(msg as any).payload?.sessionId;if(sid)sessions=sessions.filter(s=>s.id!==sid);if(h)h({type:'session.list',payload:{sessions}});break;}
+      case'session.list':listChatSessions();break;
+      case'session.create':{const id=`s-${Date.now()}`;sessionId=id;hist=[];saveChat();sessions.unshift({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
+      case'session.switch':{const sid=(msg as any).payload?.sessionId;if(sid){sessionId=sid;hist=[];loadChat();}break;}
+      case'session.delete':{const sid=(msg as any).payload?.sessionId;if(sid){sessions=sessions.filter(s=>s.id!==sid);invoke?.('cmd_delete_session',{sessionId:sid});if(sid===sessionId){sessionId='default';hist=[];loadChat();}if(h)h({type:'session.list',payload:{sessions}})}break;}
       case'chat.send':doChat((msg as any).payload?.content||'');break;
       case'chat.cancel':ac?.abort();ac=null;break;
       case'chat.clear':hist=[];if(h)h({type:'chat.clear'}as ExtensionMessage);break;
@@ -176,8 +209,7 @@ function enqueue(){if(h)sendInit(h)}
 function sendInit(dest:(m:ExtensionMessage)=>void){
   if(inited)return;inited=true;
   sendCfg();
-  dest({type:'session.list',payload:{sessions}});
-  dest({type:'chat.state',payload:{messages:[]}});
+  loadChat().then(()=>listChatSessions());
   loadWS().then(()=>{if(dest===h)dest({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}})});
 }
 function sendCfg(){if(h)h({type:'config.state',payload:{...cfg}})}
@@ -196,7 +228,7 @@ async function doChat(content:string){
       const msgs:Message[]=[{role:'system',content:sysPrompt()},...hist];
       let txt='';
       const res=await streamChat({apiKey:key,baseURL:cfg.baseURL,model:cfg.chatModel,maxTokens:cfg.maxTokens||4096,thinkingBudget:0,provider:cfg.provider},msgs,TOOLS,(tok)=>{txt+=tok;h!({type:'chat.token',payload:{text:tok}}as ExtensionMessage)},ac.signal);
-      if(!res.toolCalls?.length){hist.push({role:'assistant',content:txt});h({type:'chat.done',payload:{usage:res.usage||{inputTokens:0,outputTokens:0}}}as ExtensionMessage);return}
+      if(!res.toolCalls?.length){hist.push({role:'assistant',content:txt});saveChat();h({type:'chat.done',payload:{usage:res.usage||{inputTokens:0,outputTokens:0}}}as ExtensionMessage);return}
       for(const tc of res.toolCalls){
         const tid=tc.id||`${Date.now()}-${Math.random()}`;
         const dn=tc.name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -210,6 +242,7 @@ async function doChat(content:string){
       const tms:Message[]=res.toolCalls.map(tc=>({role:'tool'as const,content:'',toolCallId:tc.id||Date.now().toString()}));
       hist.push({role:'assistant',content:txt,toolCalls:res.toolCalls},...tms);
     }
+    saveChat();
   }catch(err:any){if(err?.name==='AbortError')return;h({type:'chat.error',payload:{message:err?.message||'Unknown error',code:'CHAT_ERROR'}}as ExtensionMessage)}
   finally{ac=null;h({type:'chat.done',payload:{usage:{inputTokens:0,outputTokens:0}}}as ExtensionMessage)}
 }

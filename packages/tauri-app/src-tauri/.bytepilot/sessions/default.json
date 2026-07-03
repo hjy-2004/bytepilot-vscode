@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    },
+    {
+      "role": "assistant",
+      "content": "你好！我是 **BytePilot**，你的桌面 AI 编程助手。\n\n我注意到你的工作区是一个 **Tauri 应用**（Rust 后端），位于 `src-tauri` 目录下。项目结构包含：\n\n- **命令模块** (`src/commands/`)：`chat.rs`、`config.rs`、`fs.rs`、`log.rs`、`shell.rs`、`workspace.rs` — 看起来是一个功能丰富的桌面应用\n- **配置**：`tauri.conf.json`、`Cargo.toml`、`build.rs`\n- **资源**：`icons/`、`gen/schemas/`\n\n有什么我可以帮你的吗？比如查看代码、修改功能、调试问题等等。"
+    }
+  ]
+}
