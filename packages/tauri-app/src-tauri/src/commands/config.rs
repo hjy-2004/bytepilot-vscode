@@ -1,9 +1,37 @@
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
 
-/// In-memory configuration store for the desktop app.
-/// In production, this would use tauri-plugin-store for persistence.
+fn config_path() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+    #[cfg(not(target_os = "windows"))]
+    let base = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+
+    let dir = PathBuf::from(&base).join("bytepilot");
+    fs::create_dir_all(&dir).ok();
+    dir.join("config.json")
+}
+
+fn load_from_disk() -> HashMap<String, String> {
+    let path = config_path();
+    if let Ok(content) = fs::read_to_string(&path) {
+        if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
+            return map;
+        }
+    }
+    HashMap::new()
+}
+
+fn save_to_disk(values: &HashMap<String, String>) {
+    let path = config_path();
+    if let Ok(json) = serde_json::to_string_pretty(values) {
+        fs::write(&path, json).ok();
+    }
+}
+
 pub struct AppConfig {
     values: Mutex<HashMap<String, String>>,
 }
@@ -11,7 +39,7 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn new() -> Self {
         Self {
-            values: Mutex::new(HashMap::new()),
+            values: Mutex::new(load_from_disk()),
         }
     }
 }
@@ -42,7 +70,6 @@ pub fn cmd_get_config(
 ) -> Result<String, String> {
     let defaults = default_config();
     let values = config.values.lock().map_err(|e| format!("{}", e))?;
-    // Check stored values first, then defaults
     if let Some(val) = values.get(&key) {
         Ok(val.clone())
     } else if let Some(val) = defaults.get(&key) {
@@ -60,6 +87,6 @@ pub fn cmd_set_config(
 ) -> Result<(), String> {
     let mut values = config.values.lock().map_err(|e| format!("{}", e))?;
     values.insert(key, value);
-    // In production, persist to disk here via tauri-plugin-store
+    save_to_disk(&values);
     Ok(())
 }

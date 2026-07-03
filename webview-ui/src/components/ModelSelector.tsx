@@ -189,7 +189,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', zIndex: 100 }}>
       <span
         onClick={() => {
           setOpen(!open);
@@ -211,15 +211,15 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
 
       {open && (
         <>
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998 }} onClick={() => setOpen(false)} />
           <div style={{
-            position: 'absolute', top: '100%', right: 0, zIndex: 99,
+            position: 'fixed', top: '50px', right: '12px', zIndex: 99999,
             background: 'var(--bytepilot-dropdown-bg)',
             border: '1px solid var(--bytepilot-dropdown-border)',
             borderRadius: '6px', minWidth: '280px', maxWidth: '340px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             marginTop: '4px', padding: '8px', fontSize: '12px',
-            maxHeight: '420px', overflowY: 'auto',
+            maxHeight: 'calc(100vh - 150px)', overflowY: 'auto',
           }}>
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>

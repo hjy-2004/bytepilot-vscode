@@ -72,6 +72,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         flexShrink: 0,
+        overflow: 'visible',
       }}>
         <SessionSelector
           sessions={sessions}
