@@ -28,6 +28,12 @@ interface StoredKey {
   apiKey: string;
 }
 
+interface ProjectEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+}
+
 const DEFAULT_CONFIG: AppConfig = {
   provider: 'anthropic',
   chatModel: 'claude-sonnet-4-6',
@@ -46,13 +52,55 @@ let _apiKeys: StoredKey[] = [];
 let _sessions: Array<{ id: string; title: string; messageCount: number; updatedAt: number }> = [];
 let _chatHistory: ChatMessage[] = [];
 let _abortController: AbortController | null = null;
+let _workspaceRoot: string = '';
+let _projectFiles: ProjectEntry[] = [];
+let _rulesContent: string = '';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-const SYSTEM_PROMPT = `You are an AI coding assistant, running in the BytePilot desktop app. You help developers write, understand, and debug code. Be concise and helpful.`;
+function buildSystemPrompt(): string {
+  let prompt = `You are BytePilot, an AI coding assistant running as a desktop app. You help developers write, understand, and debug code.
+
+## Available Tools
+When you need to interact with files, use this EXACT format at the end of your response. Each tool call must be on its own line, enclosed in a fenced code block with language "tool":
+
+\`\`\`tool
+read_file(path="src/main.rs")
+write_file(path="output.txt", content="file contents here")
+edit_file(path="src/main.rs", old_string="old code", new_string="new code")
+list_directory(path="src")
+search_files(pattern="function name")
+execute_command(command="npm test")
+\`\`\`
+
+Tool reference:
+- read_file(path) — read a file. Start with startLine and endLine for large files
+- write_file(path, content) — create or overwrite a file
+- edit_file(path, old_string, new_string) — precise replacement. old_string must match EXACTLY once
+- list_directory(path?) — list dir contents. Default: workspace root
+- search_files(pattern) — search file contents (grep), returns matches with line numbers
+- execute_command(command) — run a shell command (30s timeout)
+
+Always read a file before editing it. Prefer edit_file over write_file for changes.
+
+## Workspace Context`;
+  if (_workspaceRoot) {
+    prompt += `\nWorkspace: ${_workspaceRoot}`;
+    if (_projectFiles.length > 0) {
+      const files = _projectFiles.slice(0, 80).map(f => `- ${f.path}${f.is_dir ? '/' : ''}`).join('\n');
+      prompt += `\n\nProject structure (${_projectFiles.length} entries, showing first 80):\n${files}`;
+    }
+    if (_rulesContent) {
+      prompt += `\n\n## Project Rules (.bytepilotrules)\n${_rulesContent}`;
+    }
+  } else {
+    prompt += '\n(No workspace selected. Use the folder picker or launch from your project directory.)';
+  }
+  return prompt;
+}
 
 // ── Minimal AI Chat (fetch + SSE) ────────────────────────────────────
 
@@ -93,10 +141,7 @@ async function callAI(
     headers,
     body: JSON.stringify({
       model,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages,
-      ],
+      messages,
       stream: true,
       max_tokens: 4096,
     }),
@@ -354,8 +399,18 @@ export const tauriAdapter: IPlatformAdapter = {
         if (_handler) _handler({ type: 'chat.clear' } as ExtensionMessage);
         break;
 
+      case 'context.refresh':
+        loadWorkspaceContext();
+        break;
+
       default:
-        console.log('[TauriAdapter] Unhandled message:', message.type);
+        // Handle dynamic messages not in the type union
+        if ((message as any).type === 'workspace.pick') {
+          pickWorkspaceFolder();
+        } else {
+          console.log('[TauriAdapter] Unhandled message:', message.type);
+        }
+        break;
     }
   },
 
@@ -379,6 +434,21 @@ function sendInitMessages(handler: (message: ExtensionMessage) => void): void {
   _initSent = true;
   console.log('[TauriAdapter] Sending synthetic init messages');
 
+  // Load workspace context in background
+  loadWorkspaceContext().then(() => {
+    if (handler === _handler) {
+      handler({
+        type: 'context.update',
+        payload: {
+          openFiles: [],
+          projectFiles: _projectFiles.length,
+          diagnosticsCount: 0,
+          hasRules: !!_rulesContent,
+        },
+      });
+    }
+  });
+
   handler({
     type: 'config.state',
     payload: { ..._config },
@@ -395,6 +465,195 @@ function sendInitMessages(handler: (message: ExtensionMessage) => void): void {
   });
 }
 
+// ── Workspace ────────────────────────────────────────────────────────
+
+async function loadWorkspaceContext(): Promise<void> {
+  if (!_invoke) return;
+  try {
+    _workspaceRoot = (await _invoke('cmd_get_workspace')) as string;
+    const struct = await _invoke('cmd_scan_project') as { root: string; files: ProjectEntry[] };
+    _projectFiles = struct.files || [];
+    const rules = await _invoke('cmd_read_rules') as string | null;
+    _rulesContent = rules || '';
+    console.log(`[TauriAdapter] Workspace: ${_workspaceRoot}, ${_projectFiles.length} files, rules: ${!!_rulesContent}`);
+  } catch (e) {
+    console.log('[TauriAdapter] Workspace context unavailable:', e);
+  }
+}
+
+async function pickWorkspaceFolder(): Promise<void> {
+  if (!_invoke) return;
+  try {
+    const folder = await _invoke('cmd_pick_folder') as string | null;
+    if (folder) {
+      await _invoke('cmd_set_workspace', { path: folder });
+      _workspaceRoot = folder;
+      await loadWorkspaceContext();
+      _chatHistory = []; // reset history when workspace changes
+      if (_handler) {
+        _handler({
+          type: 'context.update',
+          payload: {
+            openFiles: [],
+            projectFiles: _projectFiles.length,
+            diagnosticsCount: 0,
+            hasRules: !!_rulesContent,
+          },
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[TauriAdapter] pickWorkspaceFolder error:', e);
+  }
+}
+
+// ── File Tools ───────────────────────────────────────────────────────
+
+async function executeTool(toolName: string, args: Record<string, string>): Promise<string> {
+  if (!_invoke) return 'Error: Workspace not available. Open a folder first.';
+
+  try {
+    switch (toolName) {
+      case 'read_file': {
+        const path = args.path || args.filePath || '';
+        if (!path) return 'Error: No file path provided.';
+        const startLine = parseInt(args.startLine || '0') || undefined;
+        const endLine = parseInt(args.endLine || '0') || undefined;
+        let content = await _invoke('cmd_read_file_workspace', { relativePath: path }) as string;
+        if (startLine && endLine) {
+          const lines = content.split('\n');
+          content = lines.slice(startLine - 1, endLine).join('\n');
+          content = `(lines ${startLine}-${endLine} of ${lines.length})\n${content}`;
+        } else if (content.length > 50000) {
+          content = content.substring(0, 50000) + `\n...(truncated, ${content.length} total chars)`;
+        }
+        return content;
+      }
+
+      case 'write_file': {
+        const p = args.path || args.filePath || '';
+        const c = args.content || '';
+        if (!p || c === undefined) return 'Error: path and content required.';
+        await _invoke('cmd_write_file_workspace', { relativePath: p, content: c });
+        return `Wrote ${c.split('\n').length} lines to "${p}".`;
+      }
+
+      case 'edit_file': {
+        const p = args.path || args.filePath || '';
+        const oldStr = args.old_string || args.oldString || '';
+        const newStr = args.new_string || args.newString || '';
+        if (!p || !oldStr) return 'Error: path and old_string required.';
+        const original = await _invoke('cmd_read_file_workspace', { relativePath: p }) as string;
+        // Normalize newlines
+        const nor = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const norOrig = nor(original);
+        const norOld = nor(oldStr);
+        let idx = original.indexOf(oldStr);
+        if (idx === -1) idx = norOrig.indexOf(norOld);
+        if (idx === -1) {
+          // Try showing context to help
+          const lines = norOrig.split('\n');
+          const firstLine = norOld.split('\n')[0] || '';
+          let hint = '';
+          for (const line of lines) {
+            if (line.trim() && line.includes(firstLine.trim().substring(0, 10))) {
+              hint = ` Did you mean: "${line.trim().substring(0, 80)}"?`;
+              break;
+            }
+          }
+          return `Error: old_string not found in "${p}".${hint} Try reading the file first to see the exact content.`;
+        }
+        const actualLen = norOld.length;
+        const after = norOrig.substring(idx + actualLen);
+        if (after.includes(norOld)) {
+          return 'Error: old_string matches multiple locations. Add more surrounding context to make it unique.';
+        }
+        const isCRLF = original.includes('\r\n');
+        const newNormalized = nor(newStr);
+        const edited = norOrig.substring(0, idx) + newNormalized + norOrig.substring(idx + actualLen);
+        const final = isCRLF ? edited.replace(/\n/g, '\r\n') : edited;
+        await _invoke('cmd_write_file_workspace', { relativePath: p, content: final });
+        const changed = (final.match(/\n/g) || []).length - (original.match(/\n/g) || []).length;
+        const lineNote = changed !== 0 ? ` (${changed > 0 ? '+' : ''}${changed} lines)` : '';
+        return `Edited "${p}": replaced ${oldStr.length}→${newStr.length} chars${lineNote}.`;
+      }
+
+      case 'list_directory': {
+        const dir = args.path || args.directoryPath || '';
+        const entries = await _invoke('cmd_list_dir_workspace', { relativePath: dir || null }) as Array<[string, boolean]>;
+        if (entries.length === 0) return '(empty directory)';
+        return entries.map(([name, isDir]) => `${isDir ? '📁' : '📄'} ${name}${isDir ? '/' : ''}`).join('\n');
+      }
+
+      case 'search_files': {
+        const pattern = args.pattern || '';
+        if (!pattern) return 'Error: No search pattern provided.';
+        const results = await _invoke('cmd_search_content', { pattern, maxResults: 20 }) as string[];
+        return results.join('\n');
+      }
+
+      case 'execute_command': {
+        const cmd = args.command || '';
+        const cwd = args.workingDirectory || args.working_directory || _workspaceRoot;
+        if (!cmd) return 'Error: No command provided.';
+        // Security: block dangerous patterns
+        const dangerous = /rm\s+-rf\s+\/|git\s+push.*--force.*\s+(main|master)|curl.*\|\s*(ba)?sh|>\/dev\/sd/;
+        if (dangerous.test(cmd)) return 'Error: Blocked dangerous command.';
+        const result = await _invoke('cmd_execute_command', { command: cmd, cwd, timeoutMs: 30000 }) as {
+          stdout: string; stderr: string; exit_code: number; killed: boolean;
+        };
+        if (result.killed) return `Timed out after 30s.\n\n${result.stdout}`;
+        const out = [result.stdout, result.stderr ? `\n[stderr]\n${result.stderr}` : ''].filter(Boolean).join('');
+        return out.substring(0, 5000) || '(no output)';
+      }
+
+      default:
+        return `Unknown tool: ${toolName}. Available: read_file, write_file, edit_file, list_directory, search_files, execute_command.`;
+    }
+  } catch (e: any) {
+    return `Error executing ${toolName}: ${e?.message || e}`;
+  }
+}
+
+/** Parse tool calls from AI response. Returns array of {tool, args}. */
+function parseToolCalls(text: string): Array<{ tool: string; args: Record<string, string> }> {
+  const results: Array<{ tool: string; args: Record<string, string> }> = [];
+  // Match fenced code blocks with language "tool"
+  const blockRegex = /```tool\n([\s\S]*?)```/g;
+  let blockMatch;
+  while ((blockMatch = blockRegex.exec(text)) !== null) {
+    const blockContent = blockMatch[1];
+    const lines = blockContent.split('\n').filter(l => l.trim());
+    for (const line of lines) {
+      const m = line.match(/^(\w+)\((.*)\)\s*$/);
+      if (!m) continue;
+      const toolName = m[1];
+      const argsStr = m[2];
+      const args: Record<string, string> = {};
+      // Parse key=value pairs handling quoted values
+      const argRegex = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/g;
+      let argMatch;
+      while ((argMatch = argRegex.exec(argsStr)) !== null) {
+        const key = argMatch[1];
+        const value = argMatch[2] ?? argMatch[3] ?? argMatch[4];
+        args[key] = value;
+      }
+      // If single argument without key= format, use positional
+      if (Object.keys(args).length === 0 && argsStr.trim()) {
+        // Try to guess: first argument = path/pattern
+        const commonFirstArgs: Record<string, string> = {
+          read_file: 'path', write_file: 'path', edit_file: 'path',
+          list_directory: 'path', search_files: 'pattern', execute_command: 'command',
+        };
+        const key = commonFirstArgs[toolName] || 'path';
+        args[key] = argsStr.trim();
+      }
+      results.push({ tool: toolName, args });
+    }
+  }
+  return results;
+}
+
 // ── Chat Engine ─────────────────────────────────────────────────────
 
 async function handleChatSend(content: string): Promise<void> {
@@ -403,59 +662,74 @@ async function handleChatSend(content: string): Promise<void> {
   const apiKey = _apiKeys.find(k => k.providerId === _config.provider)?.apiKey || '';
   const baseURL = _config.baseURL;
 
-  // Warn if no API key
   if (!apiKey && _config.provider !== 'ollama') {
-    _handler({ type: 'chat.error', payload: { message: 'No API key configured. Please set an API key in Model Settings → Custom tab.', code: 'NO_API_KEY' } } as ExtensionMessage);
+    _handler({ type: 'chat.error', payload: { message: 'No API key configured. Set an API key in Model Settings → Custom tab.', code: 'NO_API_KEY' } } as ExtensionMessage);
     return;
   }
 
-  // Add user message to history
   _chatHistory.push({ role: 'user', content });
-
-  // Notify UI that chat started
   _handler({ type: 'chat.started', payload: {} } as ExtensionMessage);
 
-  // Stream tokens via fetch + SSE
-  let fullText = '';
   _abortController = new AbortController();
+  const MAX_TOOL_TURNS = 5;
 
   try {
-    await callAI(
-      _config.provider,
-      baseURL,
-      apiKey,
-      _config.chatModel,
-      _chatHistory,
-      (token: string) => {
-        fullText += token;
-        if (_handler) {
-          _handler({ type: 'chat.token', payload: { text: token } } as ExtensionMessage);
-        }
-      },
-      _abortController.signal,
-    );
+    // Multi-turn loop: AI response → tool execution → feed back → repeat
+    for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+      console.log(`[TauriAdapter] Chat turn ${turn + 1}/${MAX_TOOL_TURNS}`);
+      const sysPrompt = buildSystemPrompt();
+      const messages: ChatMessage[] = [
+        { role: 'system', content: sysPrompt },
+        ..._chatHistory,
+      ];
 
-    // Add assistant response to history
-    _chatHistory.push({ role: 'assistant', content: fullText });
+      let fullText = '';
+      await callAI(
+        _config.provider, baseURL, apiKey, _config.chatModel, messages,
+        (token: string) => {
+          fullText += token;
+          if (_handler) _handler({ type: 'chat.token', payload: { text: token } } as ExtensionMessage);
+        },
+        _abortController.signal,
+      );
 
-    // Notify UI
-    if (_handler) {
-      _handler({
-        type: 'chat.done',
-        payload: { usage: { inputTokens: 0, outputTokens: 0 } },
-      } as ExtensionMessage);
+      // Parse tool calls
+      const toolCalls = parseToolCalls(fullText);
+      if (toolCalls.length === 0) {
+        // No tools — final response
+        _chatHistory.push({ role: 'assistant', content: fullText });
+        if (_handler) _handler({ type: 'chat.done', payload: { usage: { inputTokens: 0, outputTokens: 0 } } } as ExtensionMessage);
+        return;
+      }
+
+      // Execute tools
+      console.log(`[TauriAdapter] Executing ${toolCalls.length} tool(s):`, toolCalls.map(t => t.tool));
+      const toolResults: string[] = [];
+      for (const tc of toolCalls) {
+        if (_handler) _handler({ type: 'chat.token', payload: { text: `\n\n🔧 Running: ${tc.tool}(${Object.values(tc.args).join(', ')})...\n` } } as ExtensionMessage);
+        const result = await executeTool(tc.tool, tc.args);
+        toolResults.push(`Tool: ${tc.tool}(${JSON.stringify(tc.args)}) → ${result}`);
+        if (_handler) _handler({ type: 'chat.token', payload: { text: result.substring(0, 500) + (result.length > 500 ? '\n...(truncated)' : '') } } as ExtensionMessage);
+      }
+
+      // Feed tool results back to AI for another turn
+      _chatHistory.push({
+        role: 'assistant',
+        content: fullText + '\n\n' + toolResults.map(r => `\`\`\`tool-result\n${r}\n\`\`\``).join('\n'),
+      });
     }
+
+    // Max turns reached — finalize
+    _chatHistory.push({ role: 'assistant', content: '(Max tool turns reached. Send another message to continue.)' });
   } catch (err: any) {
     if (err?.name === 'AbortError') return;
     console.error('[TauriAdapter] Chat error:', err);
     if (_handler) {
-      _handler({
-        type: 'chat.error',
-        payload: { message: err?.message || 'Unknown error', code: 'CHAT_ERROR' },
-      } as ExtensionMessage);
+      _handler({ type: 'chat.error', payload: { message: err?.message || 'Unknown error', code: 'CHAT_ERROR' } } as ExtensionMessage);
     }
   } finally {
     _abortController = null;
+    if (_handler) _handler({ type: 'chat.done', payload: { usage: { inputTokens: 0, outputTokens: 0 } } } as ExtensionMessage);
   }
 }
 

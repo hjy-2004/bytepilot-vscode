@@ -1,12 +1,14 @@
 mod commands;
 
-use commands::{fs::*, config::*, log::*, shell::*};
+use commands::{fs::*, config::*, log::*, shell::*, workspace::*};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(AppConfig::new())
+        .manage(WorkspaceState::new())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // File system
             cmd_read_file,
@@ -29,6 +31,16 @@ pub fn run() {
             cmd_read_logs,
             cmd_get_log_stats,
             cmd_clear_logs,
+            // Workspace
+            cmd_get_workspace,
+            cmd_set_workspace,
+            cmd_scan_project,
+            cmd_read_rules,
+            cmd_read_file_workspace,
+            cmd_write_file_workspace,
+            cmd_list_dir_workspace,
+            cmd_search_content,
+            cmd_pick_folder,
             // Lifecycle
             cmd_get_workspace_root,
         ])
