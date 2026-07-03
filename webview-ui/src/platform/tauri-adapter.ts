@@ -201,7 +201,15 @@ async function initTauri(): Promise<void> {
         _config.chatModel = (await _invoke('cmd_get_config', { key: 'chatModel' }) as string) || _config.chatModel;
         _config.baseURL = (await _invoke('cmd_get_config', { key: 'baseURL' }) as string) || _config.baseURL;
       }
-      console.log('[TauriAdapter] Loaded config from Rust store');
+      // Restore stored API keys for known providers
+      const knownProviders = Object.keys(PRESETS);
+      for (const pid of knownProviders) {
+        try {
+          const key = await _invoke('cmd_get_config', { key: `apiKey.${pid}` }) as string;
+          if (key) _apiKeys.push({ providerId: pid, apiKey: key });
+        } catch { /* skip if not set */ }
+      }
+      console.log(`[TauriAdapter] Loaded config from Rust store, ${_apiKeys.length} API keys restored`);
     } catch { /* use defaults */ }
   } catch {
     console.log('[TauriAdapter] Running without Rust backend — using in-memory state');
