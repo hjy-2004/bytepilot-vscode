@@ -33,6 +33,8 @@ interface ChatContainerProps {
   onNewSession: () => void;
   onSwitchSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  onPickWorkspace?: () => void;
+  workspaceRoot?: string;
 }
 
 export const ChatContainer: React.FC<ChatContainerProps> = ({
@@ -55,6 +57,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   onNewSession,
   onSwitchSession,
   onDeleteSession,
+  onPickWorkspace,
+  workspaceRoot,
 }) => {
   const hasContent = messages.length > 0 || streamingText;
 
@@ -78,6 +82,32 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         />
         <ModelSelector config={config} onSetup={onSetup} onChangeModel={onChangeModel} onChangeSettings={onChangeSettings} onSetKey={onSetKey} onFetchModels={onFetchModels} fetchedModels={fetchedModels} isFetchingModels={isFetchingModels} />
       </div>
+
+      {/* Workspace bar */}
+      {onPickWorkspace && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '4px 12px', fontSize: '12px',
+          borderBottom: '1px solid var(--bytepilot-border)',
+          color: 'var(--bytepilot-fg-secondary)',
+        }}>
+          <span style={{ opacity: 0.7 }}>📂</span>
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {workspaceRoot || 'No folder selected'}
+          </span>
+          <button
+            onClick={onPickWorkspace}
+            style={{
+              padding: '2px 8px', fontSize: '11px',
+              background: 'var(--bytepilot-btn-secondary-bg)',
+              color: 'var(--bytepilot-btn-secondary-fg)',
+              border: 'none', borderRadius: '3px', cursor: 'pointer',
+            }}
+          >
+            Open Folder
+          </button>
+        </div>
+      )}
 
       {/* Context bar */}
       <ContextIndicator

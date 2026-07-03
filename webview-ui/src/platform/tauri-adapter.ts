@@ -105,9 +105,21 @@ Always read a file before editing it. Prefer edit_file over write_file for chang
 let _invoke: ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | null = null;
 
 async function initTauri(): Promise<void> {
+  // Prefer window.__TAURI_INTERNALS__ (Tauri v2), fall back to dynamic import
+  const w = window as any;
   try {
-    const mod = await import('@tauri-apps/api/core');
-    _invoke = mod.invoke;
+    if (w.__TAURI_INTERNALS__) {
+      // Tauri v2 — get invoke from the internals
+      const { invoke: tauriInvoke } = w.__TAURI_INTERNALS__;
+      _invoke = async (cmd: string, args?: Record<string, unknown>) => {
+        return tauriInvoke(cmd, args);
+      };
+    } else {
+      const mod = await import('@tauri-apps/api/core');
+      _invoke = mod.invoke;
+    }
+    if (!_invoke) return;
+
     // Restore config from Rust backend
     try {
       const provider = await _invoke('cmd_get_config', { key: 'provider' }) as string;
@@ -116,7 +128,6 @@ async function initTauri(): Promise<void> {
         _config.chatModel = (await _invoke('cmd_get_config', { key: 'chatModel' }) as string) || _config.chatModel;
         _config.baseURL = (await _invoke('cmd_get_config', { key: 'baseURL' }) as string) || _config.baseURL;
       }
-      // Restore stored API keys for known providers
       const knownProviders = Object.keys(PRESETS);
       for (const pid of knownProviders) {
         try {
@@ -125,9 +136,9 @@ async function initTauri(): Promise<void> {
         } catch { /* skip if not set */ }
       }
       console.log(`[TauriAdapter] Loaded config from Rust store, ${_apiKeys.length} API keys restored`);
-    } catch { /* use defaults */ }
-  } catch {
-    console.log('[TauriAdapter] Running without Rust backend — using in-memory state');
+    } catch (e) { console.log('[TauriAdapter] Config load failed:', e); }
+  } catch (e) {
+    console.log('[TauriAdapter] Running without Rust backend — using in-memory state', e);
   }
 }
 
@@ -405,14 +416,21 @@ async function loadWorkspaceContext(): Promise<void> {
 }
 
 async function pickWorkspaceFolder(): Promise<void> {
-  if (!_invoke) return;
+  if (!_invoke) {
+    // Fallback: try to re-init Tauri
+    await initTauri();
+    if (!_invoke) {
+      alert('Folder picker requires the desktop app. If you are running in a browser, you cannot open folders.');
+      return;
+    }
+  }
   try {
     const folder = await _invoke('cmd_pick_folder') as string | null;
     if (folder) {
       await _invoke('cmd_set_workspace', { path: folder });
       _workspaceRoot = folder;
       await loadWorkspaceContext();
-      _chatHistory = []; // reset history when workspace changes
+      _chatHistory = [];
       if (_handler) {
         _handler({
           type: 'context.update',
@@ -421,12 +439,14 @@ async function pickWorkspaceFolder(): Promise<void> {
             projectFiles: _projectFiles.length,
             diagnosticsCount: 0,
             hasRules: !!_rulesContent,
+            workspaceRoot: _workspaceRoot,
           },
         });
       }
     }
   } catch (e) {
     console.error('[TauriAdapter] pickWorkspaceFolder error:', e);
+    alert('Failed to open folder. Make sure you are running the Tauri desktop app, not in a browser.');
   }
 }
 

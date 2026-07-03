@@ -182,6 +182,7 @@ export interface ContextUpdateMessage {
     projectFiles: number;
     diagnosticsCount: number;
     hasRules?: boolean;
+    workspaceRoot?: string;
   };
 }
 

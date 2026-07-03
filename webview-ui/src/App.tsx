@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [fetchedModels, setFetchedModels] = useState<{ id: string; name: string }[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [workspaceRoot, setWorkspaceRoot] = useState<string>('');
 
   const handleExtensionMessage = useCallback((msg: ExtensionMessage) => {
     const store = useChatStore.getState();
@@ -67,6 +68,9 @@ const App: React.FC = () => {
         break;
       case 'context.update':
         store.updateContext(msg.payload);
+        if ((msg.payload as any).workspaceRoot) {
+          setWorkspaceRoot((msg.payload as any).workspaceRoot);
+        }
         break;
       case 'tool.requestApproval':
         store.setToolPendingApproval(msg.payload.toolCallId, msg.payload.diff);
@@ -238,6 +242,8 @@ const App: React.FC = () => {
           onNewSession={handleNewSession}
           onSwitchSession={handleSwitchSession}
           onDeleteSession={handleDeleteSession}
+          onPickWorkspace={() => postMessage({ type: 'workspace.pick' } as any)}
+          workspaceRoot={workspaceRoot}
         />
       )}
 
