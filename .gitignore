@@ -3,11 +3,23 @@ dist/
 out/
 *.vsix
 .DS_Store
+
+# Monorepo
+.turbo/
+packages/core/dist/
+packages/core/node_modules/
+packages/tauri-app/dist-sidecar/
+packages/tauri-app/node_modules/
+packages/tauri-app/src-tauri/target/
+
+# Webview
 webview-ui/node_modules/
 webview-ui/dist/
-.vscode-test/
 
-# Sensitive — contains API keys
+# IDE
+.vscode-test/
 .claude/
+
+# Sensitive
 .env
 *.env

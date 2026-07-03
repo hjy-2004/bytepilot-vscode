@@ -11,7 +11,10 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@bytepilot/core": ["../packages/core/src"]
+    }
   },
-  "include": ["src", "../src/types"]
+  "include": ["src"]
 }

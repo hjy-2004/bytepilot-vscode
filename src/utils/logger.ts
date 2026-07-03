@@ -1,10 +1,31 @@
 import * as vscode from 'vscode';
+import { setCoreLogger } from '@bytepilot/core';
+import type { ILogger } from '@bytepilot/core';
 
 let outputChannel: vscode.LogOutputChannel | null = null;
+let _coreInitialized = false;
+
+function ensureCoreLogger(): void {
+  if (_coreInitialized) return;
+  _coreInitialized = true;
+  const logger = getLogger();
+  const coreLogger: ILogger = {
+    info: (msg) => logger.info(`${timestamp()} ${msg}`),
+    error: (msg, err) => {
+      const errStr = err instanceof Error ? err.stack || err.message : String(err || '');
+      logger.error(`${timestamp()} ${msg}${errStr ? ' ' + errStr : ''}`);
+    },
+    warn: (msg) => logger.warn(`${timestamp()} ${msg}`),
+    debug: (msg) => logger.debug(`${timestamp()} ${msg}`),
+    show: (preserveFocus?: boolean) => logger.show(preserveFocus ?? false),
+  };
+  setCoreLogger(coreLogger);
+}
 
 export function getLogger(): vscode.LogOutputChannel {
   if (!outputChannel) {
     outputChannel = vscode.window.createOutputChannel('BytePilot', { log: true });
+    ensureCoreLogger();
   }
   return outputChannel;
 }

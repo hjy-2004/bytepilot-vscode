@@ -1,0 +1,44 @@
+/**
+ * VS Code theme adapter.
+ * Maps BytePilot semantic tokens to VS Code CSS custom properties.
+ * Import this in VS Code builds (the default).
+ */
+:root {
+  --bytepilot-font-family:            var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --bytepilot-font-size:              var(--vscode-font-size, 13px);
+  --bytepilot-editor-font-family:     var(--vscode-editor-font-family, monospace);
+  --bytepilot-fg-primary:             var(--vscode-foreground);
+  --bytepilot-fg-secondary:           var(--vscode-descriptionForeground);
+  --bytepilot-bg-primary:             var(--vscode-sideBar-background);
+  --bytepilot-bg-secondary:           var(--vscode-editor-background);
+  --bytepilot-border:                 var(--vscode-panel-border);
+  --bytepilot-focus-border:           var(--vscode-focusBorder);
+  --bytepilot-input-bg:               var(--vscode-input-background);
+  --bytepilot-input-fg:               var(--vscode-input-foreground);
+  --bytepilot-input-border:           var(--vscode-input-border);
+  --bytepilot-btn-bg:                 var(--vscode-button-background);
+  --bytepilot-btn-fg:                 var(--vscode-button-foreground);
+  --bytepilot-btn-hover:              var(--vscode-button-hoverBackground);
+  --bytepilot-btn-secondary-bg:       var(--vscode-button-secondaryBackground);
+  --bytepilot-btn-secondary-fg:       var(--vscode-button-secondaryForeground);
+  --bytepilot-btn-secondary-hover:    var(--vscode-button-secondaryHoverBackground);
+  --bytepilot-badge-bg:               var(--vscode-badge-background);
+  --bytepilot-badge-fg:               var(--vscode-badge-foreground);
+  --bytepilot-code-bg:                var(--vscode-textCodeBlock-background);
+  --bytepilot-blockquote-border:      var(--vscode-textBlockQuote-border);
+  --bytepilot-blockquote-bg:          var(--vscode-textBlockQuote-background);
+  --bytepilot-link-fg:                var(--vscode-textLink-foreground);
+  --bytepilot-scrollbar:              var(--vscode-scrollbarSlider-background);
+  --bytepilot-scrollbar-hover:        var(--vscode-scrollbarSlider-hoverBackground);
+  --bytepilot-titlebar-bg:            var(--vscode-titleBar-activeBackground);
+  --bytepilot-dropdown-bg:            var(--vscode-dropdown-background);
+  --bytepilot-dropdown-fg:            var(--vscode-dropdown-foreground);
+  --bytepilot-dropdown-border:        var(--vscode-dropdown-border);
+  --bytepilot-list-active-bg:         var(--vscode-list-activeSelectionBackground);
+  --bytepilot-list-active-fg:         var(--vscode-list-activeSelectionForeground);
+  --bytepilot-list-hover-bg:          var(--vscode-list-hoverBackground);
+  --bytepilot-error-bg:               var(--vscode-inputValidation-errorBackground);
+  --bytepilot-error-fg:               var(--vscode-inputValidation-errorForeground);
+  --bytepilot-progress-bg:            var(--vscode-progressBar-background);
+  --bytepilot-accent:                 var(--vscode-terminal-ansiGreen);
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@bytepilot/core",
+  "version": "0.6.0",
+  "description": "Shared core logic for BytePilot — AI engine, tools, search, session management",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint: ok'"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/google": "^1.2.22",
+    "@ai-sdk/openai": "^1.0.0",
+    "ai": "^4.0.0",
+    "diff": "^7.0.0",
+    "ignore": "^7.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
 import { computeDiffFromContent } from '../utils/diff-helper';
@@ -31,9 +30,10 @@ export const editFileTool: ToolDef = {
   },
   async getPreviewDiff(args, ctx) {
     try {
+      const fs = ctx.fs;
+      if (!fs) return undefined;
       const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
-      const uri = vscode.Uri.file(fullPath);
-      const original = (await vscode.workspace.fs.readFile(uri)).toString();
+      const original = await fs.readFile(fullPath);
       const nor = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       let idx = original.indexOf(args.oldString);
       if (idx === -1) idx = nor(original).indexOf(nor(args.oldString));
@@ -44,20 +44,21 @@ export const editFileTool: ToolDef = {
     } catch { return undefined; }
   },
   async call(args, ctx) {
+    const fs = ctx.fs;
+    if (!fs) return 'Error: No filesystem available.';
     const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
-    if (!fullPath.startsWith(ctx.workspaceRoot + path.sep) && fullPath !== ctx.workspaceRoot) {
+    if (!fs.isWithinWorkspace(fullPath)) {
       return `Error: Cannot edit outside workspace.`;
     }
 
     try {
-      const uri = vscode.Uri.file(fullPath);
       let original: string;
       try {
-        const stat = await vscode.workspace.fs.stat(uri);
-        if (stat.size > MAX_FILE_SIZE) {
-          return `Error: File too large (${(stat.size / 1024).toFixed(0)}KB). Use write_file for full replacement.`;
+        const st = await fs.stat(fullPath);
+        if (st.size > MAX_FILE_SIZE) {
+          return `Error: File too large (${(st.size / 1024).toFixed(0)}KB). Use write_file for full replacement.`;
         }
-        original = (await vscode.workspace.fs.readFile(uri)).toString();
+        original = await fs.readFile(fullPath);
       } catch {
         return `Error: File not found: ${args.filePath}. Use write_file to create a new file.`;
       }
@@ -65,12 +66,10 @@ export const editFileTool: ToolDef = {
       const oldStr = args.oldString;
       const newStr = args.newString;
 
-      // Normalize line endings: Windows \r\n → \n
       const normalizeNewlines = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const normalizedOriginal = normalizeNewlines(original);
       const normalizedOld = normalizeNewlines(oldStr);
 
-      // Smart matching: try exact first, then normalized, then with quote normalization
       let matchIndex = original.indexOf(oldStr);
       if (matchIndex === -1) {
         matchIndex = normalizedOriginal.indexOf(normalizedOld);
@@ -81,7 +80,6 @@ export const editFileTool: ToolDef = {
       }
 
       if (matchIndex === -1) {
-        // Show relevant context to help the AI fix its old_string
         const lines = normalizedOriginal.split('\n');
         const oldFirstLine = normalizedOld.split('\n')[0] || '';
         let bestMatch = '';
@@ -97,22 +95,19 @@ export const editFileTool: ToolDef = {
         return `Error: old_string not found.\n${hint}`;
       }
 
-      // Check for duplicate matches (on normalized text)
       const actualOldLen = normalizedOld.length;
       const afterMatch = normalizedOriginal.substring(matchIndex + actualOldLen);
       if (afterMatch.includes(normalizedOld)) {
         return `Error: old_string matches multiple locations. Add more surrounding context (2-3 lines) to make it unique.`;
       }
 
-      // Apply the edit on normalized text, then restore original line endings
       const isCRLF = original.includes('\r\n');
       const newStrNormalized = normalizeNewlines(newStr);
       const editedNormalized = normalizedOriginal.substring(0, matchIndex) + newStrNormalized + normalizedOriginal.substring(matchIndex + actualOldLen);
       const edited = isCRLF ? editedNormalized.replace(/\n/g, '\r\n') : editedNormalized;
 
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(edited, 'utf-8'));
+      await fs.writeFile(fullPath, edited);
 
-      // Generate visual diff for the UI
       if (ctx.onDiff) {
         const unifiedDiff = computeDiffFromContent(args.filePath, original, edited);
         ctx.onDiff(unifiedDiff);

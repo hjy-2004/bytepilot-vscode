@@ -1,0 +1,43 @@
+/**
+ * Desktop theme — Catppuccin Mocha inspired dark palette.
+ * Used by the Tauri desktop app. Replace this file when building for desktop.
+ */
+:root {
+  --bytepilot-font-family:            -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --bytepilot-font-size:              13px;
+  --bytepilot-editor-font-family:     'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+  --bytepilot-fg-primary:             #cdd6f4;
+  --bytepilot-fg-secondary:           #a6adc8;
+  --bytepilot-bg-primary:             #1e1e2e;
+  --bytepilot-bg-secondary:           #181825;
+  --bytepilot-border:                 #45475a;
+  --bytepilot-focus-border:           #89b4fa;
+  --bytepilot-input-bg:               #313244;
+  --bytepilot-input-fg:               #cdd6f4;
+  --bytepilot-input-border:           #585b70;
+  --bytepilot-btn-bg:                 #89b4fa;
+  --bytepilot-btn-fg:                 #1e1e2e;
+  --bytepilot-btn-hover:              #74c7ec;
+  --bytepilot-btn-secondary-bg:       #45475a;
+  --bytepilot-btn-secondary-fg:       #cdd6f4;
+  --bytepilot-btn-secondary-hover:    #585b70;
+  --bytepilot-badge-bg:               #45475a;
+  --bytepilot-badge-fg:               #cdd6f4;
+  --bytepilot-code-bg:                #11111b;
+  --bytepilot-blockquote-border:      #89b4fa;
+  --bytepilot-blockquote-bg:          rgba(137, 180, 250, 0.05);
+  --bytepilot-link-fg:                #89b4fa;
+  --bytepilot-scrollbar:              #585b70;
+  --bytepilot-scrollbar-hover:        #6c7086;
+  --bytepilot-titlebar-bg:            #11111b;
+  --bytepilot-dropdown-bg:            #313244;
+  --bytepilot-dropdown-fg:            #cdd6f4;
+  --bytepilot-dropdown-border:        #45475a;
+  --bytepilot-list-active-bg:         #45475a;
+  --bytepilot-list-active-fg:         #cdd6f4;
+  --bytepilot-list-hover-bg:          #313244;
+  --bytepilot-error-bg:               rgba(243, 139, 168, 0.15);
+  --bytepilot-error-fg:               #f38ba8;
+  --bytepilot-progress-bg:            #89b4fa;
+  --bytepilot-accent:                 #a6e3a1;
+}

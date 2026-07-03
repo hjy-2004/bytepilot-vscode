@@ -19,6 +19,9 @@ const config = {
   keepNames: true,
   logLevel: 'info',
   absWorkingDir: __dirname,
+  alias: {
+    '@bytepilot/core': path.resolve(__dirname, 'packages', 'core', 'dist'),
+  },
 };
 
 if (isWatch) {

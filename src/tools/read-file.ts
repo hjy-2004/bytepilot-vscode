@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
 
@@ -10,7 +9,7 @@ export const readFileTool: ToolDef = {
   permissionLevel: 'read',
   isConcurrencySafe: () => true,
   isReadOnly: () => true,
-  maxResultChars: Infinity, // Never persist — self-bounded via limits
+  maxResultChars: Infinity,
   inputSchema: z.object({
     filePath: z.string().describe('Path relative to workspace root'),
     startLine: z.number().int().positive().optional().describe('Start line (1-indexed)'),
@@ -22,16 +21,17 @@ export const readFileTool: ToolDef = {
   },
   async call(args, ctx) {
     const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
-    if (!fullPath.startsWith(ctx.workspaceRoot + path.sep) && fullPath !== ctx.workspaceRoot) {
+    if (ctx.fs && !ctx.fs.isWithinWorkspace(fullPath)) {
       return `Error: Access denied. "${args.filePath}" is outside the workspace.`;
     }
     try {
-      const uri = vscode.Uri.file(fullPath);
-      const stat = await vscode.workspace.fs.stat(uri);
-      if (stat.size > 1024 * 1024) {
-        return `Error: File too large (${(stat.size / 1024 / 1024).toFixed(1)}MB). Use startLine/endLine to read specific ranges.`;
+      const fs = ctx.fs;
+      if (!fs) return 'Error: No filesystem available.';
+      const st = await fs.stat(fullPath);
+      if (st.size > 1024 * 1024) {
+        return `Error: File too large (${(st.size / 1024 / 1024).toFixed(1)}MB). Use startLine/endLine to read specific ranges.`;
       }
-      const content = (await vscode.workspace.fs.readFile(uri)).toString();
+      const content = await fs.readFile(fullPath);
       const lines = content.split('\n');
       const start = (args.startLine ?? 1) - 1;
       const end = args.endLine ? Math.min(args.endLine, lines.length) : lines.length;

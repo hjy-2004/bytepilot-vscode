@@ -22,7 +22,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
       borderRadius: '4px',
       overflow: 'hidden',
       margin: '8px 0',
-      border: '1px solid var(--vscode-panel-border)',
+      border: '1px solid var(--bytepilot-border)',
     }}>
       {/* Header bar */}
       <div style={{
@@ -30,9 +30,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '4px 8px',
-        background: 'var(--vscode-titleBar-activeBackground)',
+        background: 'var(--bytepilot-titlebar-bg)',
         fontSize: '11px',
-        color: 'var(--vscode-descriptionForeground)',
+        color: 'var(--bytepilot-fg-secondary)',
       }}>
         <span>{language}</span>
         <button
@@ -40,7 +40,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--vscode-descriptionForeground)',
+            color: 'var(--bytepilot-fg-secondary)',
             cursor: 'pointer',
             fontSize: '11px',
           }}

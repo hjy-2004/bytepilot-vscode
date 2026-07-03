@@ -5,7 +5,7 @@ import { logInfo, logError } from '../utils/logger';
 import { saveFullHistory, appendMessage } from '../chat/history';
 import { runAgentLoop, type AgentCallbacks } from './agent-loop';
 import { estimateTokens, trimContextToBudget } from '../utils/token-counter';
-import * as vscode from 'vscode';
+import type { IConfigStore } from '@bytepilot/core';
 import type { ApiConfig, ToolDef } from './api-client';
 import type { Message, Attachment } from './message-types';
 
@@ -63,6 +63,7 @@ export class ChatEngine {
   constructor(
     private readonly chatModel: LanguageModelV1,
     private readonly toolRegistry: ToolRegistry,
+    private readonly config: IConfigStore,
     private readonly getSystemContext?: () => Promise<string>,
     provider?: string,
     baseURL?: string,
@@ -120,7 +121,7 @@ export class ChatEngine {
     const sysInfo = `\n\n## System Info\n- OS: ${process.platform} (${process.platform === 'win32' ? 'use cmd /c, del, rmdir; not rm, rm -rf, mkdir' : 'use standard Unix commands'})`;
     let contextPart = '';
     if (sysCtx) {
-      const contextLimit = vscode.workspace.getConfiguration('aiCodingAgent').get<number>('contextLength') ?? 128000;
+      const contextLimit = this.config.get<number>('contextLength', 128000);
       // Reserve ~70% of context for conversation; allow ~30% for system + context
       const maxCtxTokens = Math.floor(contextLimit * 0.3);
       const { trimmed, estimatedTokens, wasTrimmed } = trimContextToBudget(sysCtx, maxCtxTokens);
@@ -152,8 +153,8 @@ export class ChatEngine {
       apiKey: this.apiKey,
       baseURL: this.baseURL,
       model: ((this.chatModel as any).modelId || 'unknown').replace(/\[.*\]$/, ''), // strip thinking budget suffix
-      maxTokens: vscode.workspace.getConfiguration('aiCodingAgent').get<number>('maxTokens') ?? 4096,
-      thinkingBudget: vscode.workspace.getConfiguration('aiCodingAgent').get<number>('thinkingBudget') ?? 4096,
+      maxTokens: this.config.get<number>('maxTokens', 4096),
+      thinkingBudget: this.config.get<number>('thinkingBudget', 4096),
       provider: this.provider,
     };
 

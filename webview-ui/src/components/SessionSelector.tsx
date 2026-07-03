@@ -32,9 +32,9 @@ export const SessionSelector: React.FC<SessionSelectorProps> = ({
         onClick={() => setOpen(!open)}
         title={active?.title || 'Select session'}
         style={{
-          background: 'var(--vscode-dropdown-background)',
-          color: 'var(--vscode-dropdown-foreground)',
-          border: '1px solid var(--vscode-dropdown-border)',
+          background: 'var(--bytepilot-dropdown-bg)',
+          color: 'var(--bytepilot-dropdown-fg)',
+          border: '1px solid var(--bytepilot-dropdown-border)',
           padding: '2px 6px',
           borderRadius: '3px',
           cursor: 'pointer',
@@ -56,8 +56,8 @@ export const SessionSelector: React.FC<SessionSelectorProps> = ({
           />
           <div style={{
             position: 'absolute', top: '100%', left: 0, zIndex: 100,
-            background: 'var(--vscode-dropdown-background)',
-            border: '1px solid var(--vscode-dropdown-border)',
+            background: 'var(--bytepilot-dropdown-bg)',
+            border: '1px solid var(--bytepilot-dropdown-border)',
             borderRadius: '4px',
             minWidth: '200px',
             maxHeight: '240px',
@@ -72,15 +72,15 @@ export const SessionSelector: React.FC<SessionSelectorProps> = ({
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
-                  background: s.id === activeId ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent',
-                  color: s.id === activeId ? 'var(--vscode-list-activeSelectionForeground)' : 'var(--vscode-foreground)',
+                  background: s.id === activeId ? 'var(--bytepilot-list-active-bg)' : 'transparent',
+                  color: s.id === activeId ? 'var(--bytepilot-list-active-fg)' : 'var(--bytepilot-fg-primary)',
                 }}
-                onMouseEnter={e => { if (s.id !== activeId) (e.target as HTMLElement).style.background = 'var(--vscode-list-hoverBackground)'; }}
+                onMouseEnter={e => { if (s.id !== activeId) (e.target as HTMLElement).style.background = 'var(--bytepilot-list-hover-bg)'; }}
                 onMouseLeave={e => { if (s.id !== activeId) (e.target as HTMLElement).style.background = 'transparent'; }}
               >
                 <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {s.title}
-                  <span style={{ color: 'var(--vscode-descriptionForeground)', fontSize: '10px', marginLeft: '4px' }}>
+                  <span style={{ color: 'var(--bytepilot-fg-secondary)', fontSize: '10px', marginLeft: '4px' }}>
                     ({s.messageCount})
                   </span>
                 </div>
@@ -88,7 +88,7 @@ export const SessionSelector: React.FC<SessionSelectorProps> = ({
                   onClick={e => { e.stopPropagation(); onDelete(s.id); }}
                   title="Delete session"
                   style={{
-                    background: 'none', border: 'none', color: 'var(--vscode-descriptionForeground)',
+                    background: 'none', border: 'none', color: 'var(--bytepilot-fg-secondary)',
                     cursor: 'pointer', fontSize: '12px', padding: '0 2px',
                   }}
                 >
@@ -100,8 +100,8 @@ export const SessionSelector: React.FC<SessionSelectorProps> = ({
               onClick={() => { onNew(); setOpen(false); }}
               style={{
                 padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
-                borderTop: '1px solid var(--vscode-dropdown-border)',
-                color: 'var(--vscode-textLink-foreground)',
+                borderTop: '1px solid var(--bytepilot-dropdown-border)',
+                color: 'var(--bytepilot-link-fg)',
               }}
             >
               + New Chat

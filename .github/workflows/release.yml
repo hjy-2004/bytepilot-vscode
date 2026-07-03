@@ -6,7 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  release-vscode:
+    name: Release VS Code Extension
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -17,12 +18,55 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - run: cd webview-ui && npm ci
-      - run: npm run build
+      - name: Build
+        run: |
+          cd packages/core && npm run build
+          cd ../..
+          node esbuild.config.mjs
+          cd webview-ui && npm ci && npm run build
       - name: Package VSIX
         run: npx vsce package
+      - name: Publish to VS Code Marketplace
+        run: npx vsce publish --packagePath *.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: '*.vsix'
+          generate_release_notes: true
+
+  release-desktop:
+    name: Release Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x64
+            file: bytepilot_*_amd64.deb
+          - os: windows-latest
+            name: windows-x64
+            file: bytepilot_*_x64-setup.exe
+          - os: macos-latest
+            name: macos-x64
+            file: bytepilot_*_x64.dmg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - name: Build webview
+        run: cd webview-ui && npm ci && npm run build
+      - name: Build Tauri app
+        run: cd packages/tauri-app && npm ci && npx tauri build
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/tauri-app/src-tauri/target/release/bundle/${{ matrix.file }}
           generate_release_notes: true

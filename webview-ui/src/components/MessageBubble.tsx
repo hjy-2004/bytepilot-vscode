@@ -26,16 +26,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
         padding: '8px 12px',
         borderRadius: '8px',
         background: isUser
-          ? 'var(--vscode-button-background)'
+          ? 'var(--bytepilot-btn-bg)'
           : isSystem
-            ? 'var(--vscode-inputValidation-errorBackground)'
-            : 'var(--vscode-editor-background)',
+            ? 'var(--bytepilot-error-bg)'
+            : 'var(--bytepilot-bg-secondary)',
         color: isUser
-          ? 'var(--vscode-button-foreground)'
+          ? 'var(--bytepilot-btn-fg)'
           : isSystem
-            ? 'var(--vscode-inputValidation-errorForeground)'
-            : 'var(--vscode-foreground)',
-        border: isUser ? 'none' : '1px solid var(--vscode-panel-border)',
+            ? 'var(--bytepilot-error-fg)'
+            : 'var(--bytepilot-fg-primary)',
+        border: isUser ? 'none' : '1px solid var(--bytepilot-border)',
         fontSize: '13px',
       }}>
         {/* Role label */}
@@ -73,7 +73,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   return (
                     <code
                       style={{
-                        background: 'var(--vscode-textCodeBlock-background)',
+                        background: 'var(--bytepilot-code-bg)',
                         padding: '1px 4px',
                         borderRadius: '3px',
                         fontSize: '12px',
@@ -91,7 +91,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   return (
                     <a
                       href={href}
-                      style={{ color: 'var(--vscode-textLink-foreground)' }}
+                      style={{ color: 'var(--bytepilot-link-fg)' }}
                       onClick={(e) => {
                         e.preventDefault();
                         if (href) {
@@ -112,7 +112,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                 display: 'inline-block',
                 width: '8px',
                 height: '14px',
-                background: 'var(--vscode-foreground)',
+                background: 'var(--bytepilot-fg-primary)',
                 marginLeft: '1px',
                 animation: 'blink 1s step-end infinite',
                 verticalAlign: 'text-bottom',

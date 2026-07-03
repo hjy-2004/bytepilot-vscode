@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
 import { computeDiffFromContent } from '../utils/diff-helper';
@@ -25,10 +24,11 @@ export const writeFileTool: ToolDef = {
   async getPreviewDiff(args, ctx) {
     try {
       const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
-      const uri = vscode.Uri.file(fullPath);
+      const fs = ctx.fs;
+      if (!fs) return undefined;
       let original = '';
       try {
-        original = (await vscode.workspace.fs.readFile(uri)).toString();
+        original = await fs.readFile(fullPath);
       } catch {
         // File doesn't exist — diff shows all new content
       }
@@ -36,24 +36,25 @@ export const writeFileTool: ToolDef = {
     } catch { return undefined; }
   },
   async call(args, ctx) {
+    const fs = ctx.fs;
+    if (!fs) return 'Error: No filesystem available.';
     const fullPath = path.resolve(ctx.workspaceRoot, args.filePath);
-    if (!fullPath.startsWith(ctx.workspaceRoot + path.sep) && fullPath !== ctx.workspaceRoot) {
+    if (!fs.isWithinWorkspace(fullPath)) {
       return `Error: Cannot write outside workspace.`;
     }
     try {
       const dir = path.dirname(fullPath);
-      await vscode.workspace.fs.createDirectory(vscode.Uri.file(dir));
-      const uri = vscode.Uri.file(fullPath);
+      await fs.createDirectory(dir);
 
       // Check if file already exists (for diff generation)
       let original: string | null = null;
       try {
-        original = (await vscode.workspace.fs.readFile(uri)).toString();
+        original = await fs.readFile(fullPath);
       } catch {
         // File doesn't exist yet — no diff to generate
       }
 
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(args.content, 'utf-8'));
+      await fs.writeFile(fullPath, args.content);
 
       if (original !== null && ctx.onDiff) {
         const unifiedDiff = computeDiffFromContent(args.filePath, original, args.content);

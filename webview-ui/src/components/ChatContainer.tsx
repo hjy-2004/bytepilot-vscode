@@ -63,7 +63,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       {/* Header */}
       <div style={{
         padding: '6px 12px',
-        borderBottom: '1px solid var(--vscode-panel-border)',
+        borderBottom: '1px solid var(--bytepilot-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -98,7 +98,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          padding: '20px', color: 'var(--vscode-descriptionForeground)', textAlign: 'center',
+          padding: '20px', color: 'var(--bytepilot-fg-secondary)', textAlign: 'center',
         }}>
           <div style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.5 }}>&#129302;</div>
           <h3 style={{ marginBottom: '8px', fontWeight: 500 }}>AI Coding Agent</h3>

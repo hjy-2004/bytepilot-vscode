@@ -11,7 +11,7 @@ export const DiffView: React.FC<DiffViewProps> = React.memo(({ diff }) => {
   if (!diff.hunks.length) {
     return (
       <div style={{
-        border: '1px solid var(--vscode-panel-border)',
+        border: '1px solid var(--bytepilot-border)',
         borderRadius: '4px',
         overflow: 'hidden',
         fontSize: '12px',
@@ -19,13 +19,13 @@ export const DiffView: React.FC<DiffViewProps> = React.memo(({ diff }) => {
       }}>
         <div style={{
           padding: '4px 8px',
-          background: 'var(--vscode-titleBar-activeBackground)',
+          background: 'var(--bytepilot-titlebar-bg)',
           fontWeight: 600,
           fontSize: '11px',
         }}>
           {diff.fileName}
         </div>
-        <div style={{ padding: '8px', color: 'var(--vscode-descriptionForeground)', fontStyle: 'italic' }}>
+        <div style={{ padding: '8px', color: 'var(--bytepilot-fg-secondary)', fontStyle: 'italic' }}>
           No changes.
         </div>
       </div>
@@ -34,7 +34,7 @@ export const DiffView: React.FC<DiffViewProps> = React.memo(({ diff }) => {
 
   return (
     <div style={{
-      border: '1px solid var(--vscode-panel-border)',
+      border: '1px solid var(--bytepilot-border)',
       borderRadius: '4px',
       overflow: 'hidden',
       fontSize: '12px',
@@ -44,7 +44,7 @@ export const DiffView: React.FC<DiffViewProps> = React.memo(({ diff }) => {
       <div style={{
         maxHeight: '400px',
         overflow: 'auto',
-        fontFamily: 'var(--vscode-editor-font-family, monospace)',
+        fontFamily: 'var(--bytepilot-editor-font-family, monospace)',
         fontSize: '11px',
         lineHeight: '1.5',
       }}>
@@ -59,7 +59,7 @@ export const DiffView: React.FC<DiffViewProps> = React.memo(({ diff }) => {
 const DiffHeader: React.FC<{ fileName: string; stats: UnifiedDiff['stats'] }> = ({ fileName, stats }) => (
   <div style={{
     padding: '4px 8px',
-    background: 'var(--vscode-titleBar-activeBackground)',
+    background: 'var(--bytepilot-titlebar-bg)',
     fontWeight: 600,
     fontSize: '11px',
     display: 'flex',
@@ -100,12 +100,12 @@ const DiffHunkView: React.FC<{ hunk: DiffHunk }> = ({ hunk }) => {
   return (
     <div>
       <div style={{
-        background: 'var(--vscode-textBlockQuote-background)',
-        color: 'var(--vscode-descriptionForeground)',
+        background: 'var(--bytepilot-blockquote-bg)',
+        color: 'var(--bytepilot-fg-secondary)',
         padding: '1px 8px',
         fontSize: '10px',
-        borderTop: '1px solid var(--vscode-panel-border)',
-        borderBottom: '1px solid var(--vscode-panel-border)',
+        borderTop: '1px solid var(--bytepilot-border)',
+        borderBottom: '1px solid var(--bytepilot-border)',
       }}>
         @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
       </div>
@@ -158,8 +158,8 @@ function renderLines(
           onClick={() => toggle(i)}
           style={{
             padding: '2px 8px',
-            background: 'var(--vscode-sideBar-background)',
-            color: 'var(--vscode-textLink-foreground)',
+            background: 'var(--bytepilot-bg-primary)',
+            color: 'var(--bytepilot-link-fg)',
             cursor: 'pointer',
             textAlign: 'center',
             fontSize: '10px',
@@ -186,7 +186,7 @@ function renderLines(
         ? '#4ac26b'
         : line.type === 'removed'
           ? '#f14c4c'
-          : 'var(--vscode-descriptionForeground)';
+          : 'var(--bytepilot-fg-secondary)';
 
     result.push(
       <div
@@ -203,7 +203,7 @@ function renderLines(
           width: '44px',
           textAlign: 'right',
           paddingRight: '4px',
-          color: 'var(--vscode-descriptionForeground)',
+          color: 'var(--bytepilot-fg-secondary)',
           opacity: 0.5,
           flexShrink: 0,
           userSelect: 'none',
@@ -215,7 +215,7 @@ function renderLines(
           width: '44px',
           textAlign: 'right',
           paddingRight: '4px',
-          color: 'var(--vscode-descriptionForeground)',
+          color: 'var(--bytepilot-fg-secondary)',
           opacity: 0.5,
           flexShrink: 0,
           userSelect: 'none',

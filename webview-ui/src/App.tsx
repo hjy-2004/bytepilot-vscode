@@ -2,7 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { ChatContainer } from './components/ChatContainer';
 import { SetupWizard, type FoundConfig } from './components/SetupWizard';
 
-import { useVSCode, useOnExtensionMessage } from './hooks/useVSCode';
+import { usePlatform, useOnMessage } from './hooks/usePlatform';
 import { useChatStore } from './state/chat-store';
 import type { ExtensionMessage } from './types/ipc';
 
@@ -14,7 +14,7 @@ interface SessionInfo {
 }
 
 const App: React.FC = () => {
-  const { postMessage } = useVSCode();
+  const { postMessage } = usePlatform();
 
   // Use individual selectors to avoid re-rendering on unrelated store changes
   const messages = useChatStore((s) => s.messages);
@@ -90,7 +90,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  useOnExtensionMessage(handleExtensionMessage);
+  useOnMessage(handleExtensionMessage);
 
   const handleSend = useCallback((content: string, attachments?: Array<{ name: string; content: string; type: 'image'; mimeType: string }>) => {
     useChatStore.getState().addUserMessage(content);
@@ -201,7 +201,7 @@ const App: React.FC = () => {
       {!configLoaded ? (
         <div style={{
           height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--vscode-descriptionForeground)', fontSize: '13px',
+          color: 'var(--bytepilot-fg-secondary)', fontSize: '13px',
         }}>
           Loading...
         </div>

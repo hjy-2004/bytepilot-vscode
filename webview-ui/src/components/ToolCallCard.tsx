@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ToolCallEntry } from '../state/chat-store';
 import { useChatStore } from '../state/chat-store';
-import { useVSCode } from '../hooks/useVSCode';
+import { usePlatform } from '../hooks/usePlatform';
 import { DiffView } from './DiffView';
 
 interface ToolCallCardProps { toolCall: ToolCallEntry; }
@@ -16,7 +16,7 @@ function formatElapsed(ms: number): string {
 }
 
 export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall }) => {
-  const { postMessage } = useVSCode();
+  const { postMessage } = usePlatform();
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const startTime = useRef<number>(0);
@@ -70,14 +70,14 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
     barBg = 'rgba(200,0,0,0.06)';
   } else {
     icon = '\u23F3'; label = '';
-    barBg = 'var(--vscode-sideBar-background)';
+    barBg = 'var(--bytepilot-bg-primary)';
   }
 
   const borderColor = isPending ? '#cca700'
     : isRunning ? 'rgba(0,122,204,0.5)'
     : isDone ? 'rgba(0,128,0,0.3)'
     : isError ? 'rgba(200,0,0,0.4)'
-    : 'var(--vscode-panel-border)';
+    : 'var(--bytepilot-border)';
 
   return (
     <div style={{
@@ -113,7 +113,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
           opacity: 0.7,
           fontSize: '11px',
           flex: 1,
-          color: isRunning ? 'var(--vscode-textLink-foreground)' : undefined,
+          color: isRunning ? 'var(--bytepilot-link-fg)' : undefined,
         }}>
           {label}
         </span>
@@ -122,14 +122,14 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
           <div style={{
             width: '60px',
             height: '3px',
-            background: 'var(--vscode-panel-border)',
+            background: 'var(--bytepilot-border)',
             borderRadius: '2px',
             overflow: 'hidden',
             flexShrink: 0,
           }}>
             <div style={{
               height: '100%',
-              background: 'var(--vscode-textLink-foreground)',
+              background: 'var(--bytepilot-link-fg)',
               borderRadius: '2px',
               animation: 'pulseBar 1.5s ease-in-out infinite',
               width: '100%',
@@ -150,7 +150,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                   <div style={{ marginBottom: '4px' }}>
                     <div style={{ fontWeight: 600, marginBottom: '2px' }}>Arguments:</div>
                     <pre style={{
-                      background: 'var(--vscode-textCodeBlock-background)',
+                      background: 'var(--bytepilot-code-bg)',
                       padding: '4px 8px',
                       borderRadius: '3px',
                       fontSize: '11px',
@@ -194,7 +194,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                 <div style={{ marginBottom: '4px' }}>
                   <div style={{ fontWeight: 600, marginBottom: '2px' }}>Arguments:</div>
                   <pre style={{
-                    background: 'var(--vscode-textCodeBlock-background)',
+                    background: 'var(--bytepilot-code-bg)',
                     padding: '4px 8px',
                     borderRadius: '3px',
                     fontSize: '11px',
@@ -213,7 +213,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  color: 'var(--vscode-descriptionForeground)',
+                  color: 'var(--bytepilot-fg-secondary)',
                   fontSize: '12px',
                 }}>
                   <div style={{ display: 'flex', gap: '4px' }}>
@@ -233,7 +233,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                     <DiffView diff={toolCall.diff} />
                   ) : (
                     <pre style={{
-                      background: 'var(--vscode-textCodeBlock-background)',
+                      background: 'var(--bytepilot-code-bg)',
                       padding: '4px 8px',
                       borderRadius: '3px',
                       fontSize: '11px',

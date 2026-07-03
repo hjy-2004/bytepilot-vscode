@@ -1,8 +1,14 @@
 {
   "name": "bytepilot",
   "displayName": "BytePilot",
+  "private": true,
+  "workspaces": [
+    "packages/core",
+    "packages/tauri-app"
+  ],
   "description": "Cursor-like AI coding assistant for VS Code",
   "version": "0.5.0",
+  "packageManager": "npm@11.18.0",
   "publisher": "bytepilot",
   "repository": "https://github.com/hjy-2004/bytepilot-vscode",
   "engines": {
@@ -225,14 +231,19 @@
     }
   },
   "scripts": {
-    "build": "node esbuild.config.mjs && cd webview-ui && npm run build",
+    "build": "turbo run build --filter=!@bytepilot/tauri-app && node esbuild.config.mjs && cd webview-ui && npm run build",
+    "build:core": "turbo run build --filter=@bytepilot/core",
     "build:ext": "node esbuild.config.mjs",
-    "watch": "node esbuild.config.mjs --watch",
     "build:webview": "cd webview-ui && npm run build",
+    "build:tauri": "cd packages/tauri-app && set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && npx tauri build",
+    "watch": "node esbuild.config.mjs --watch",
     "dev:webview": "cd webview-ui && npm run dev",
-    "lint": "eslint src --ext .ts",
+    "dev:tauri": "cd packages/tauri-app && set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && npx tauri dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
     "package": "vsce package",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "clean": "turbo run clean"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -242,6 +253,7 @@
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.24.0",
     "eslint": "^10.6.0",
+    "turbo": "^2.10.2",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.62.0"
   },

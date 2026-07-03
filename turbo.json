@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "dist-sidecar/**"],
+      "env": ["NODE_ENV"]
+    },
+    "build:core": {
+      "outputs": ["dist/**"]
+    },
+    "build:ext": {
+      "outputs": ["dist/**"],
+      "dependsOn": ["^build"]
+    },
+    "build:webview": {
+      "outputs": ["dist/**"],
+      "cache": false
+    },
+    "watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "test": {},
+    "typecheck": {}
+  }
+}

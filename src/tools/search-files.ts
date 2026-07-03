@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
 import { getSemanticSearch } from '../context/semantic-search';
@@ -30,6 +29,17 @@ export const searchFilesTool: ToolDef = {
     if (args.semantic) {
       try {
         const ss = getSemanticSearch();
+        if (ctx.fs && !ss.isReady()) {
+          const fs = ctx.fs as any;
+          if (fs.findFilesForSearch) {
+            ss.setWorkspaceRoot(ctx.workspaceRoot);
+            ss.setProvider({
+              findFiles: (inc: string, exc: string, max: number) => fs.findFiles(ctx.workspaceRoot, inc, exc, max),
+              readFile: (p: string) => fs.readFile(p),
+              stat: (p: string) => fs.stat(p).then((s: any) => ({ size: s.size })),
+            });
+          }
+        }
         if (!ss.isReady()) {
           await ss.buildIndex();
         }
@@ -48,30 +58,34 @@ export const searchFilesTool: ToolDef = {
           ? snippets.join('\n\n---\n\n')
           : `No results for "${args.pattern}"`;
       } catch (err: any) {
-        return `Semantic search error: ${err.message}. Falling back to text search...`;
+        return `Semantic search error: ${err.message}.`;
       }
     }
 
     try {
+      const fs = ctx.fs;
+      if (!fs) return 'Error: No filesystem available.';
+
       if (args.searchType === 'file') {
         const pat = args.pattern.startsWith('**/') ? args.pattern : `**/${args.pattern}`;
-        const uris = await vscode.workspace.findFiles(pat, exclude, maxResults);
-        if (uris.length === 0) return `No files matching "${args.pattern}"`;
-        return uris.map(u => `- ${path.relative(ctx.workspaceRoot, u.fsPath)}`).join('\n');
+        const files = await fs.findFiles(ctx.workspaceRoot, pat, exclude, maxResults);
+        if (files.length === 0) return `No files matching "${args.pattern}"`;
+        return files.map(f => `- ${path.relative(ctx.workspaceRoot, f)}`).join('\n');
       }
-      const uris = await vscode.workspace.findFiles('**/*', exclude, maxResults * 3);
+      const files = await fs.findFiles(ctx.workspaceRoot, '**/*', exclude, maxResults * 3);
       const results: { file: string; line: number; text: string }[] = [];
       const lower = args.pattern.toLowerCase();
-      const MAX_FILE_SIZE = 256 * 1024; // 256KB per file for content search
-      for (const uri of uris) {
+      const MAX_FILE_SIZE = 256 * 1024;
+      for (const filePath of files) {
         if (results.length >= maxResults) break;
         try {
-          const stat = await vscode.workspace.fs.stat(uri);
-          if (stat.size > MAX_FILE_SIZE) continue; // Skip large files
-          const lines = (await vscode.workspace.fs.readFile(uri)).toString().split('\n');
+          const st = await fs.stat(path.resolve(ctx.workspaceRoot, filePath));
+          if (st.size > MAX_FILE_SIZE) continue;
+          const content = await fs.readFile(path.resolve(ctx.workspaceRoot, filePath));
+          const lines = content.split('\n');
           for (let i = 0; i < lines.length && results.length < maxResults; i++) {
             if (lines[i].toLowerCase().includes(lower)) {
-              results.push({ file: path.relative(ctx.workspaceRoot, uri.fsPath), line: i + 1, text: lines[i].trim().substring(0, 200) });
+              results.push({ file: path.relative(ctx.workspaceRoot, filePath), line: i + 1, text: lines[i].trim().substring(0, 200) });
             }
           }
         } catch { /* skip */ }

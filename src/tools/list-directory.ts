@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ToolDef } from '../types/tools';
 
@@ -21,6 +20,8 @@ export const listDirectoryTool: ToolDef = {
     return args.directoryPath || '.';
   },
   async call(args, ctx) {
+    const fs = ctx.fs;
+    if (!fs) return 'Error: No filesystem available.';
     const depth = args.depth ?? 1;
     const dirPath = args.directoryPath ? path.resolve(ctx.workspaceRoot, args.directoryPath) : ctx.workspaceRoot;
     const result: string[] = [];
@@ -28,18 +29,18 @@ export const listDirectoryTool: ToolDef = {
     async function walk(dir: string, d: number, indent: string = ''): Promise<void> {
       if (d > depth || result.length >= 200) return;
       try {
-        const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(dir));
-        for (const [name, type] of entries) {
+        const entries = await fs!.readDirectory(dir);
+        for (const [name, isDir] of entries) {
           if (EXCLUDES.includes(name) || name.startsWith('.')) continue;
           if (result.length >= 200) break;
           const rel = path.relative(ctx.workspaceRoot, path.join(dir, name));
-          if (type === vscode.FileType.Directory) {
+          if (isDir) {
             result.push(`${indent}${rel}/`);
             if (d < depth) await walk(path.join(dir, name), d + 1, indent + '  ');
           } else {
             try {
-              const stat = await vscode.workspace.fs.stat(vscode.Uri.file(path.join(dir, name)));
-              const size = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
+              const st = await fs!.stat(path.join(dir, name));
+              const size = st.size < 1024 ? `${st.size}B` : st.size < 1048576 ? `${(st.size / 1024).toFixed(1)}KB` : `${(st.size / 1048576).toFixed(1)}MB`;
               result.push(`${indent}${rel} (${size})`);
             } catch { result.push(`${indent}${rel}`); }
           }

@@ -19,8 +19,8 @@ export const ContextIndicator: React.FC<ContextIndicatorProps> = ({
     <div className="context-bar">
       {hasRules && (
         <span className="context-pill" title=".bytepilotrules loaded" style={{
-          background: 'var(--vscode-badge-background)',
-          color: 'var(--vscode-badge-foreground)',
+          background: 'var(--bytepilot-badge-bg)',
+          color: 'var(--bytepilot-badge-fg)',
         }}>
           Rules active
         </span>
@@ -37,8 +37,8 @@ export const ContextIndicator: React.FC<ContextIndicatorProps> = ({
       )}
       {diagnosticsCount > 0 && (
         <span className="context-pill" title="Errors/warnings" style={{
-          background: 'var(--vscode-inputValidation-errorBackground)',
-          color: 'var(--vscode-inputValidation-errorForeground)',
+          background: 'var(--bytepilot-error-bg)',
+          color: 'var(--bytepilot-error-fg)',
         }}>
           {diagnosticsCount} issue{diagnosticsCount !== 1 ? 's' : ''}
         </span>

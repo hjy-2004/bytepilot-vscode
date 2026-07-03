@@ -33,7 +33,7 @@ export const PermissionDialog: React.FC<PermissionDialogProps> = ({
           <div style={{ fontSize: '12px' }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>Details:</div>
             <pre style={{
-              background: 'var(--vscode-textCodeBlock-background)',
+              background: 'var(--bytepilot-code-bg)',
               padding: '8px',
               borderRadius: '4px',
               fontSize: '12px',

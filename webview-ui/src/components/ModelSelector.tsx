@@ -94,7 +94,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
 
   if (!config?.initialized) {
     return (
-      <button onClick={onSetup} style={{ fontSize: '11px', color: 'var(--vscode-button-foreground)', background: 'var(--vscode-button-background)', padding: '2px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}>
+      <button onClick={onSetup} style={{ fontSize: '11px', color: 'var(--bytepilot-btn-fg)', background: 'var(--bytepilot-btn-bg)', padding: '2px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}>
         Setup AI
       </button>
     );
@@ -201,8 +201,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
         }}
         title="Model settings"
         style={{
-          fontSize: '11px', color: 'var(--vscode-descriptionForeground)',
-          background: 'var(--vscode-badge-background)', padding: '2px 8px',
+          fontSize: '11px', color: 'var(--bytepilot-fg-secondary)',
+          background: 'var(--bytepilot-badge-bg)', padding: '2px 8px',
           borderRadius: '8px', cursor: 'pointer', userSelect: 'none',
         }}
       >
@@ -214,8 +214,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
           <div style={{
             position: 'absolute', top: '100%', right: 0, zIndex: 99,
-            background: 'var(--vscode-dropdown-background)',
-            border: '1px solid var(--vscode-dropdown-border)',
+            background: 'var(--bytepilot-dropdown-bg)',
+            border: '1px solid var(--bytepilot-dropdown-border)',
             borderRadius: '6px', minWidth: '280px', maxWidth: '340px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             marginTop: '4px', padding: '8px', fontSize: '12px',
@@ -227,16 +227,16 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                 onClick={() => setTab('quick')}
                 style={{
                   flex: 1, padding: '3px 6px', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '11px',
-                  background: tab === 'quick' ? 'var(--vscode-button-background)' : 'var(--vscode-button-secondaryBackground)',
-                  color: tab === 'quick' ? 'var(--vscode-button-foreground)' : 'var(--vscode-button-secondaryForeground)',
+                  background: tab === 'quick' ? 'var(--bytepilot-btn-bg)' : 'var(--bytepilot-btn-secondary-bg)',
+                  color: tab === 'quick' ? 'var(--bytepilot-btn-fg)' : 'var(--bytepilot-btn-secondary-fg)',
                 }}
               >Provider & Model</button>
               <button
                 onClick={() => setTab('custom')}
                 style={{
                   flex: 1, padding: '3px 6px', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '11px',
-                  background: tab === 'custom' ? 'var(--vscode-button-background)' : 'var(--vscode-button-secondaryBackground)',
-                  color: tab === 'custom' ? 'var(--vscode-button-foreground)' : 'var(--vscode-button-secondaryForeground)',
+                  background: tab === 'custom' ? 'var(--bytepilot-btn-bg)' : 'var(--bytepilot-btn-secondary-bg)',
+                  color: tab === 'custom' ? 'var(--bytepilot-btn-fg)' : 'var(--bytepilot-btn-secondary-fg)',
                 }}
               >Custom</button>
             </div>
@@ -251,8 +251,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                     placeholder="Filter providers..."
                     style={{
                       width: '100%', fontSize: '11px', padding: '2px 6px', boxSizing: 'border-box',
-                      background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)',
-                      border: '1px solid var(--vscode-input-border)', borderRadius: '3px', outline: 'none',
+                      background: 'var(--bytepilot-input-bg)', color: 'var(--bytepilot-input-fg)',
+                      border: '1px solid var(--bytepilot-input-border)', borderRadius: '3px', outline: 'none',
                     }}
                   />
                 </div>
@@ -261,7 +261,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                 {groupedProviders.map(group => (
                   <div key={group.category} style={{ marginBottom: '4px' }}>
                     <div style={{
-                      fontSize: '10px', color: 'var(--vscode-descriptionForeground)',
+                      fontSize: '10px', color: 'var(--bytepilot-fg-secondary)',
                       padding: '2px 0', fontWeight: 600, textTransform: 'uppercase',
                     }}>
                       {CATEGORY_LABELS[group.category] || group.category}
@@ -274,8 +274,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                           title={`${p.label}${p.defaultBaseURL ? ' - ' + p.defaultBaseURL : ''}`}
                           style={{
                             fontSize: '10px', padding: '2px 6px', borderRadius: '3px', cursor: 'pointer',
-                            background: p.id === provider ? 'var(--vscode-button-background)' : 'var(--vscode-badge-background)',
-                            color: p.id === provider ? 'var(--vscode-button-foreground)' : 'var(--vscode-badge-foreground)',
+                            background: p.id === provider ? 'var(--bytepilot-btn-bg)' : 'var(--bytepilot-badge-bg)',
+                            color: p.id === provider ? 'var(--bytepilot-btn-fg)' : 'var(--bytepilot-badge-fg)',
                             border: '1px solid transparent',
                           }}
                         >
@@ -293,7 +293,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       marginTop: '8px', marginBottom: '2px',
                     }}>
-                      <span style={{ fontSize: '10px', color: 'var(--vscode-descriptionForeground)', fontWeight: 600 }}>
+                      <span style={{ fontSize: '10px', color: 'var(--bytepilot-fg-secondary)', fontWeight: 600 }}>
                         Models ({currentProvider?.label || provider}){fetchedModelIds ? ` · ${fetchedModelIds.length} fetched` : ''}
                       </span>
                       {onFetchModels && (
@@ -315,10 +315,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                         onClick={() => handleQuickPick(m)}
                         style={{
                           padding: '3px 6px', cursor: 'pointer', borderRadius: '3px',
-                          background: m === config.chatModel ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent',
-                          color: m === config.chatModel ? 'var(--vscode-list-activeSelectionForeground)' : 'var(--vscode-foreground)',
+                          background: m === config.chatModel ? 'var(--bytepilot-list-active-bg)' : 'transparent',
+                          color: m === config.chatModel ? 'var(--bytepilot-list-active-fg)' : 'var(--bytepilot-fg-primary)',
                         }}
-                        onMouseEnter={e => { if (m !== config.chatModel) (e.target as HTMLElement).style.background = 'var(--vscode-list-hoverBackground)'; }}
+                        onMouseEnter={e => { if (m !== config.chatModel) (e.target as HTMLElement).style.background = 'var(--bytepilot-list-hover-bg)'; }}
                         onMouseLeave={e => { if (m !== config.chatModel) (e.target as HTMLElement).style.background = 'transparent'; }}
                       >
                         {m}
@@ -330,7 +330,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
             ) : (
               <div>
                 <div style={{ marginBottom: '4px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--vscode-descriptionForeground)' }}>Model ID</div>
+                  <div style={{ fontSize: '10px', color: 'var(--bytepilot-fg-secondary)' }}>Model ID</div>
                   <input
                     autoFocus
                     value={customModel}
@@ -338,26 +338,26 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                     placeholder="e.g. gpt-4o"
                     style={{
                       width: '100%', fontSize: '11px', padding: '2px 4px', boxSizing: 'border-box',
-                      background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)',
-                      border: '1px solid var(--vscode-input-border)', borderRadius: '3px', outline: 'none',
+                      background: 'var(--bytepilot-input-bg)', color: 'var(--bytepilot-input-fg)',
+                      border: '1px solid var(--bytepilot-input-border)', borderRadius: '3px', outline: 'none',
                     }}
                   />
                 </div>
                 <div style={{ marginBottom: '4px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--vscode-descriptionForeground)' }}>Base URL (optional)</div>
+                  <div style={{ fontSize: '10px', color: 'var(--bytepilot-fg-secondary)' }}>Base URL (optional)</div>
                   <input
                     value={customURL}
                     onChange={e => setCustomURL(e.target.value)}
                     placeholder={config.baseURL || 'https://api.openai.com/v1'}
                     style={{
                       width: '100%', fontSize: '11px', padding: '2px 4px', boxSizing: 'border-box',
-                      background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)',
-                      border: '1px solid var(--vscode-input-border)', borderRadius: '3px', outline: 'none',
+                      background: 'var(--bytepilot-input-bg)', color: 'var(--bytepilot-input-fg)',
+                      border: '1px solid var(--bytepilot-input-border)', borderRadius: '3px', outline: 'none',
                     }}
                   />
                 </div>
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--vscode-descriptionForeground)' }}>API Key (optional)</div>
+                  <div style={{ fontSize: '10px', color: 'var(--bytepilot-fg-secondary)' }}>API Key (optional)</div>
                   <input
                     type="password"
                     value={customKey}
@@ -365,8 +365,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                     placeholder="sk-..."
                     style={{
                       width: '100%', fontSize: '11px', padding: '2px 4px', boxSizing: 'border-box',
-                      background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)',
-                      border: '1px solid var(--vscode-input-border)', borderRadius: '3px', outline: 'none',
+                      background: 'var(--bytepilot-input-bg)', color: 'var(--bytepilot-input-fg)',
+                      border: '1px solid var(--bytepilot-input-border)', borderRadius: '3px', outline: 'none',
                     }}
                   />
                 </div>
@@ -375,7 +375,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ config, onSetup, o
                   disabled={!customModel.trim()}
                   style={{
                     width: '100%', padding: '3px 8px', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '11px',
-                    background: 'var(--vscode-button-background)', color: 'var(--vscode-button-foreground)',
+                    background: 'var(--bytepilot-btn-bg)', color: 'var(--bytepilot-btn-fg)',
                     opacity: customModel.trim() ? 1 : 0.5,
                   }}
                 >Apply</button>

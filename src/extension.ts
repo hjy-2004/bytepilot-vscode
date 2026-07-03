@@ -11,7 +11,7 @@ import { SecretsStore } from './ai/secrets-store';
 import { ChatEngine } from './ai/chat-engine';
 import { ToolRegistry } from './tools/registry';
 import { MessageRouter } from './chat/router';
-import { getConfigState } from './config/settings';
+import { getConfigState, initConfigStore } from './config/settings';
 import { ContextCollector } from './context/collector';
 import { generateText } from 'ai';
 import { InlineCompletionProvider } from './completion/inline-provider';
@@ -19,6 +19,9 @@ import { CompletionEngine } from './ai/completion-engine';
 import { loadSessionMessages, createSession, listSessions } from './chat/history';
 import { interactiveImport, scanKnownLocations, importCachedConfig } from './config/importer';
 import type { WebViewMessage } from './types/ipc';
+import { VSCodeConfigStore } from './platform/vscode-config';
+import { VSCodeFileSystem } from './platform/vscode-filesystem';
+import { VSCodeEditorHost } from './platform/vscode-editor';
 
 // Tool imports
 import { readFileTool } from './tools/read-file';
@@ -36,6 +39,9 @@ let toolRegistry: ToolRegistry;
 let messageRouter: MessageRouter;
 let chatEngine: ChatEngine | null = null;
 let contextCollector: ContextCollector;
+let configStore: VSCodeConfigStore;
+let vscodeFs: VSCodeFileSystem;
+let vscodeEditor: VSCodeEditorHost;
 let inlineProvider: InlineCompletionProvider;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -46,6 +52,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showLogger();
   }
   disposables = new DisposableStore();
+
+  // --- Config Store ---
+  configStore = new VSCodeConfigStore();
+  initConfigStore(configStore);
+
+  // --- Platform adapters ---
+  const wsRoot = getWorkspaceRoot();
+  vscodeFs = new VSCodeFileSystem(wsRoot);
+  vscodeEditor = new VSCodeEditorHost(wsRoot);
 
   // --- Context Collector ---
   contextCollector = new ContextCollector();
@@ -76,7 +91,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   toolRegistry.setExecutionContext({
     workspaceRoot: workspaceFolder,
     signal: new AbortController().signal,
+    fs: vscodeFs,
+    editor: vscodeEditor,
   });
+
 
   // --- Message Router (must be created BEFORE ChatEngine) ---
   messageRouter = new MessageRouter(
@@ -93,7 +111,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       try {
         const model = providerManager.getChatModel();
         const cfg = getConfigState();
-        const engine = new ChatEngine(model, toolRegistry, () => contextCollector.getContextString(), cfg.provider, cfg.baseURL, providerManager.getConfig()?.apiKey);
+        const engine = new ChatEngine(model, toolRegistry, configStore, () => contextCollector.getContextString(), cfg.provider, cfg.baseURL, providerManager.getConfig()?.apiKey);
         engine.setWorkspacePath(getWorkspaceRoot());
         engine.setSessionIdProvider(() => messageRouter?.getActiveSession() || '');
         return engine;
@@ -166,6 +184,7 @@ function createChatEngine(): void {
     chatEngine = new ChatEngine(
       model,
       toolRegistry,
+      configStore,
       () => contextCollector.getContextString(),
       cfg.provider,
       cfg.baseURL,
@@ -199,7 +218,7 @@ function createChatEngine(): void {
 function updateCompletionEngine(): void {
   try {
     const model = providerManager.getCompletionModel();
-    inlineProvider?.setEngine(new CompletionEngine(model));
+    inlineProvider?.setEngine(new CompletionEngine(model, configStore));
     inlineProvider?.setApiKeyProvider(() => providerManager.getConfig()?.apiKey);
     inlineProvider?.setBaseURLProvider(() => providerManager.getConfig()?.baseURL);
     inlineProvider?.setProviderProvider(() => providerManager.getConfig()?.provider);
@@ -217,6 +236,8 @@ function handleWebViewMessage(message: WebViewMessage): void {
   toolRegistry.setExecutionContext({
     workspaceRoot: getWorkspaceRoot(),
     signal: new AbortController().signal,
+    fs: new VSCodeFileSystem(getWorkspaceRoot()),
+    editor: new VSCodeEditorHost(getWorkspaceRoot()),
   });
   messageRouter.handle(message);
 }

@@ -25,7 +25,7 @@ const WorkingIndicator: React.FC<{ text: string }> = ({ text }) => {
       </div>
       <span style={{
         fontSize: '12px',
-        color: 'var(--vscode-descriptionForeground)',
+        color: 'var(--bytepilot-fg-secondary)',
         fontWeight: 400,
       }}>
         {text}

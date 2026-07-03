@@ -1,5 +1,5 @@
-import * as vscode from 'vscode';
 import type { LanguageModelV1 } from 'ai';
+import type { IConfigStore } from '@bytepilot/core';
 import { logInfo } from '../utils/logger';
 import { detectApiFormat } from '../config/provider-presets';
 
@@ -9,7 +9,10 @@ import { detectApiFormat } from '../config/provider-presets';
  * OpenAI and Anthropic fall back to a chat-completion based approach.
  */
 export class CompletionEngine {
-  constructor(private model: LanguageModelV1) {}
+  constructor(
+    private model: LanguageModelV1,
+    private config: IConfigStore,
+  ) {}
 
   updateModel(model: LanguageModelV1): void {
     this.model = model;
@@ -24,9 +27,8 @@ export class CompletionEngine {
     abortSignal?: AbortSignal,
   ): Promise<string | null> {
     const modelId = this.model.modelId.replace(/\[.*\]$/, '').trim();
-    const cfg = vscode.workspace.getConfiguration('aiCodingAgent');
-    const temperature = cfg.get<number>('completionTemperature') ?? 0.0;
-    const maxTokens = cfg.get<number>('completionMaxTokens') ?? 256;
+    const temperature = this.config.get<number>('completionTemperature', 0.0);
+    const maxTokens = this.config.get<number>('completionMaxTokens', 256);
 
     // Use smart detection: baseURL + provider context determines the effective provider
     const url = (baseURL || '').toLowerCase();

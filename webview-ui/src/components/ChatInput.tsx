@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useVSCode } from '../hooks/useVSCode';
+import { usePlatform } from '../hooks/usePlatform';
 import { useChatStore } from '../state/chat-store';
 
 interface ChatInputProps {
@@ -19,7 +19,7 @@ const SLASH_COMMANDS = [
 ];
 
 export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStreaming }) => {
-  const { postMessage } = useVSCode();
+  const { postMessage } = usePlatform();
   const [input, setInput] = useState('');
   const [imageAttachments, setImageAttachments] = useState<ImageAttachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -255,7 +255,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
       {selectedFiles.length > 0 && (
         <div style={{ display: 'flex', gap: '4px', padding: '2px 0', flexWrap: 'wrap' }}>
           {selectedFiles.map(f => (
-            <span key={f.path} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', padding: '1px 6px', borderRadius: '10px', background: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)' }}>
+            <span key={f.path} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', padding: '1px 6px', borderRadius: '10px', background: 'var(--bytepilot-badge-bg)', color: 'var(--bytepilot-badge-fg)' }}>
               @{f.path}
               <span onClick={() => removeSelectedFile(f)} style={{ cursor: 'pointer', fontWeight: 700, opacity: 0.7 }}>×</span>
             </span>
@@ -266,7 +266,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
       {imageAttachments.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', padding: '4px 0', flexWrap: 'wrap' }}>
           {imageAttachments.map((img, idx) => (
-            <div key={idx} style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--vscode-panel-border)' }}>
+            <div key={idx} style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--bytepilot-border)' }}>
               <img src={img.content} alt="pasted" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               <span onClick={() => removeImage(idx)} style={{ position: 'absolute', top: '1px', right: '3px', cursor: 'pointer', color: '#fff', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', lineHeight: 1 }}>×</span>
             </div>
@@ -274,12 +274,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
         </div>
       )}
       {(mentionActive || slashActive) && (
-        <div ref={dropdownRef} style={{ position: 'absolute', bottom: '100%', left: '8px', maxHeight: '200px', overflow: 'auto', background: 'var(--vscode-dropdown-background)', border: '1px solid var(--vscode-dropdown-border)', borderRadius: '4px', zIndex: 100, minWidth: '200px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+        <div ref={dropdownRef} style={{ position: 'absolute', bottom: '100%', left: '8px', maxHeight: '200px', overflow: 'auto', background: 'var(--bytepilot-dropdown-bg)', border: '1px solid var(--bytepilot-dropdown-border)', borderRadius: '4px', zIndex: 100, minWidth: '200px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
           {mentionFiles.length === 0 ? (
-            <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--vscode-descriptionForeground)' }}>{mentionQuery ? 'No matching files' : 'Type to search files...'}</div>
+            <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--bytepilot-fg-secondary)' }}>{mentionQuery ? 'No matching files' : 'Type to search files...'}</div>
           ) : mentionFiles.map((f, i) => (
             <div key={f.path} onClick={() => slashActive ? executeSlashCommand(f.path) : insertMention(f)} onMouseEnter={() => slashActive ? setSlashIndex(i) : setMentionIndex(i)}
-              style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer', background: i === (slashActive ? slashIndex : mentionIndex) ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent', color: i === (slashActive ? slashIndex : mentionIndex) ? 'var(--vscode-list-activeSelectionForeground)' : 'var(--vscode-foreground)', display: 'flex', justifyContent: 'space-between' }}>
+              style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer', background: i === (slashActive ? slashIndex : mentionIndex) ? 'var(--bytepilot-list-active-bg)' : 'transparent', color: i === (slashActive ? slashIndex : mentionIndex) ? 'var(--bytepilot-list-active-fg)' : 'var(--bytepilot-fg-primary)', display: 'flex', justifyContent: 'space-between' }}>
               <span>{slashActive ? f.path : f.name}</span><span style={{ opacity: 0.5, fontSize: '11px' }}>{slashActive ? f.name : f.path}</span>
             </div>
           ))}
@@ -292,7 +292,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
           disabled={isStreaming}
           style={{
             background: 'transparent', border: 'none', cursor: isStreaming ? 'default' : 'pointer',
-            color: 'var(--vscode-descriptionForeground)', padding: '0 4px 0 6px',
+            color: 'var(--bytepilot-fg-secondary)', padding: '0 4px 0 6px',
             opacity: isStreaming ? 0.4 : 0.7, flexShrink: 0, display: 'flex', alignItems: 'center',
           }}
         >
@@ -306,7 +306,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
           onSelect={(e) => detectMention(input, (e.target as HTMLTextAreaElement).selectionStart)}
           placeholder={isStreaming ? 'AI is responding...' : 'Ask anything... Use @file to reference files, paste images'} rows={1} disabled={isStreaming} />
         {isStreaming ? (
-          <button className="chat-send-btn" onClick={onCancel} style={{ background: 'var(--vscode-button-secondaryBackground)' }}>Stop</button>
+          <button className="chat-send-btn" onClick={onCancel} style={{ background: 'var(--bytepilot-btn-secondary-bg)' }}>Stop</button>
         ) : (
           <button className="chat-send-btn" onClick={handleSend} disabled={!input.trim() && imageAttachments.length === 0}>Send</button>
         )}

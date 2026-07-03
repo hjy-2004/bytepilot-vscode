@@ -4,6 +4,7 @@
 src/**
 node_modules/**
 .claude/**
+packages/**
 webview-ui/src/**
 webview-ui/node_modules/**
 webview-ui/package-lock.json
@@ -11,5 +12,7 @@ webview-ui/tsconfig.json
 webview-ui/vite.config.ts
 webview-ui/index.html
 *.map
+*.vsix
 esbuild.config.mjs
 tsconfig.json
+tsconfig.base.json
