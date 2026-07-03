@@ -91,24 +91,14 @@ function buildSystemPrompt(): string {
   let prompt = `You are BytePilot, an AI coding assistant running as a desktop app. You help developers write, understand, and debug code.
 
 ## Available Tools
-When you need to interact with files, use this EXACT format at the end of your response. Each tool call must be on its own line, enclosed in a fenced code block with language "tool":
+You have access to file and system tools. When you need to use one, write the tool call on its own line:
 
-\`\`\`tool
-read_file(path="src/main.rs")
-write_file(path="output.txt", content="file contents here")
-edit_file(path="src/main.rs", old_string="old code", new_string="new code")
-list_directory(path="src")
-search_files(pattern="function name")
-execute_command(command="npm test")
-\`\`\`
-
-Tool reference:
-- read_file(path) — read a file. Start with startLine and endLine for large files
-- write_file(path, content) — create or overwrite a file
-- edit_file(path, old_string, new_string) — precise replacement. old_string must match EXACTLY once
-- list_directory(path?) — list dir contents. Default: workspace root
-- search_files(pattern) — search file contents (grep), returns matches with line numbers
-- execute_command(command) — run a shell command (30s timeout)
+read_file(path) — read a file (use startLine/endLine for large files)
+write_file(path, content) — create or overwrite a file
+edit_file(path, old_string, new_string) — precise string replacement
+list_directory(path?) — list directory contents
+search_files(pattern) — search file contents (grep)
+execute_command(command) — run a shell command (30s timeout)
 
 Always read a file before editing it. Prefer edit_file over write_file for changes.
 
@@ -673,11 +663,12 @@ async function handleChatSend(content: string): Promise<void> {
         [],
         (token: string) => {
           fullText += token;
-          // Detect start of tool block — stop forwarding tokens to UI
-          if (!bufferingTool && fullText.includes('\n```tool\n')) {
-            bufferingTool = true;
+          // Detect tool invocation start — stop forwarding tokens to UI.
+          // Matches: ```tool\n, ```tool\n, or Claude's "tool\nCopy\nname(args)" pattern
+          if (!bufferingTool) {
+            const hasToolBlock = fullText.includes('```tool') || /(?:^|\n)tool\s*\n(?:Copy\s*\n)?\w+\(/.test(fullText);
+            if (hasToolBlock) bufferingTool = true;
           }
-          // Only forward non-tool tokens to UI
           if (!bufferingTool) {
             if (_handler) _handler({ type: 'chat.token', payload: { text: token } } as ExtensionMessage);
           }
@@ -685,8 +676,11 @@ async function handleChatSend(content: string): Promise<void> {
         _abortController.signal,
       );
 
-      // Strip tool blocks from displayed text, keep clean text for history
-      const cleanText = fullText.replace(/```tool\n[\s\S]*?```/g, '').trim();
+      // Strip tool sections from displayed text
+      const cleanText = fullText
+        .replace(/```tool[\s\S]*?```/g, '')
+        .replace(/(?:^|\n)tool\s*\n(?:Copy\s*\n)?[\s\S]*?(?=\n\n|$)/g, '')
+        .trim();
 
       // Parse tool calls
       const toolCalls = parseToolCalls(fullText);
@@ -694,11 +688,6 @@ async function handleChatSend(content: string): Promise<void> {
         _chatHistory.push({ role: 'assistant', content: cleanText });
         if (_handler) _handler({ type: 'chat.done', payload: { usage: { inputTokens: 0, outputTokens: 0 } } } as ExtensionMessage);
         return;
-      }
-
-      // Update UI with clean text (replace the streamed tokens)
-      if (_handler && bufferingTool) {
-        _handler({ type: 'chat.token', payload: { text: '\n' } } as ExtensionMessage);
       }
 
       // Execute tools with structured messages (for UI diff rendering)
