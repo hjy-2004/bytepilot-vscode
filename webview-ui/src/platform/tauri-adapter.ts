@@ -1,10 +1,10 @@
 /**
  * Tauri desktop platform adapter — handles config, chat, tools, sessions.
- * Uses @bytepilot/core's streamChat with native tool calling.
+ * Uses @bytepilot/core's runAgentLoop with native tool calling.
  */
 import type { IPlatformAdapter } from './types';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
-import { streamChat } from '@bytepilot/core/ai/api-client';
+import { runAgentLoop, type AgentCallbacks } from '@bytepilot/core/ai/agent-loop';
 import type { Message } from '@bytepilot/core/ai/message-types';
 
 // ── Tool definitions ─────────────────────────────────────────────────
@@ -216,33 +216,77 @@ function sendCfg(){if(h)h({type:'config.state',payload:{...cfg}})}
 
 // ── Chat ─────────────────────────────────────────────────────────────
 
-async function doChat(content:string){
-  if(!h)return;
-  const key=keys.find(k=>k.pid===cfg.provider)?.key||'';
-  if(!key&&cfg.provider!=='ollama'){h({type:'chat.error',payload:{message:'No API key configured.',code:'NO_API_KEY'}}as ExtensionMessage);return}
-  hist.push({role:'user',content});
-  h({type:'chat.started',payload:{}}as ExtensionMessage);
-  ac=new AbortController();
-  try{
-    for(let t=0;t<5;t++){
-      const msgs:Message[]=[{role:'system',content:sysPrompt()},...hist];
-      let txt='';
-      const res=await streamChat({apiKey:key,baseURL:cfg.baseURL,model:cfg.chatModel,maxTokens:cfg.maxTokens||4096,thinkingBudget:0,provider:cfg.provider},msgs,TOOLS,(tok)=>{txt+=tok;h!({type:'chat.token',payload:{text:tok}}as ExtensionMessage)},ac.signal);
-      if(!res.toolCalls?.length){hist.push({role:'assistant',content:txt});saveChat();h({type:'chat.done',payload:{usage:res.usage||{inputTokens:0,outputTokens:0}}}as ExtensionMessage);return}
-      for(const tc of res.toolCalls){
-        const tid=tc.id||`${Date.now()}-${Math.random()}`;
-        const dn=tc.name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-        const args=tc.args as Record<string,string>;
-        h({type:'chat.toolCall',payload:{id:tid,name:tc.name,displayName:dn,args,needsApproval:false}}as ExtensionMessage);
-        let diff:LocDiff|undefined;
-        if((tc.name==='write_file'||tc.name==='edit_file')&&args.path){try{const orig=await invoke?.('cmd_read_file_workspace',{relativePath:args.path})as string;const r=await execTool(tc.name,args);const nc=await invoke?.('cmd_read_file_workspace',{relativePath:args.path})as string;diff=mkdiff(args.path,orig||'',nc||'');h({type:'chat.toolResult',payload:{id:tid,name:tc.name,result:r,success:!r.startsWith('Error'),diff:diff as any}}as ExtensionMessage);continue}catch{}}
-        const r=await execTool(tc.name,args);
-        h({type:'chat.toolResult',payload:{id:tid,name:tc.name,result:r,success:!r.startsWith('Error')}}as ExtensionMessage);
+async function doChat(content: string) {
+  if (!h) return;
+  const key = keys.find(k => k.pid === cfg.provider)?.key || '';
+  if (!key && cfg.provider !== 'ollama') {
+    h({ type: 'chat.error', payload: { message: 'No API key configured.', code: 'NO_API_KEY' } } as ExtensionMessage);
+    return;
+  }
+  hist.push({ role: 'user', content });
+  ac = new AbortController();
+
+  const toolDiffs = new Map<string, LocDiff>();
+  let pendingToolId = '';
+
+  const cb: AgentCallbacks = {
+    onStarted: () => {
+      h!({ type: 'chat.started', payload: {} } as ExtensionMessage);
+    },
+    onToken: (text) => {
+      h!({ type: 'chat.token', payload: { text } } as ExtensionMessage);
+    },
+    onToolCall: (id, name, displayName, args) => {
+      pendingToolId = id;
+      h!({ type: 'chat.toolCall', payload: { id, name, displayName, args, needsApproval: false } } as ExtensionMessage);
+    },
+    onApprovalNeeded: async () => true,
+    onToolResult: (id, name, result, success) => {
+      const diff = toolDiffs.get(id);
+      if (diff) toolDiffs.delete(id);
+      h!({ type: 'chat.toolResult', payload: { id, name, result, success, diff: diff as any } } as ExtensionMessage);
+    },
+    getDisplayName: (name) => name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    executeTool: async (name, args) => {
+      const sargs = args as Record<string, string>;
+      const tid = pendingToolId;
+      if ((name === 'write_file' || name === 'edit_file') && args.path && invoke) {
+        try {
+          const p = (args.path || (args as any).filePath || '') as string;
+          const orig = await invoke('cmd_read_file_workspace', { relativePath: p }) as string;
+          const r = await execTool(name, sargs);
+          const nc = await invoke('cmd_read_file_workspace', { relativePath: p }) as string;
+          const diff = mkdiff(p, orig || '', nc || '');
+          if (diff) toolDiffs.set(tid, diff);
+          const ok = !r.startsWith('Error');
+          return { result: r, success: ok };
+        } catch (e: any) {
+          return { result: `Error: ${e.message}`, success: false };
+        }
       }
-      const tms:Message[]=res.toolCalls.map(tc=>({role:'tool'as const,content:'',toolCallId:tc.id||Date.now().toString()}));
-      hist.push({role:'assistant',content:txt,toolCalls:res.toolCalls},...tms);
-    }
+      const r = await execTool(name, sargs);
+      return { result: r, success: !r.startsWith('Error') };
+    },
+    isReadOnly: (name) => !['write_file', 'edit_file', 'execute_command'].includes(name),
+    onHistoryChanged: () => { saveChat(); },
+  };
+
+  try {
+    await runAgentLoop(
+      { apiKey: key, baseURL: cfg.baseURL, model: cfg.chatModel, maxTokens: cfg.maxTokens || 4096, thinkingBudget: 0, provider: cfg.provider },
+      hist,
+      sysPrompt(),
+      TOOLS,
+      cb,
+      500,
+      ac.signal,
+    );
     saveChat();
-  }catch(err:any){if(err?.name==='AbortError')return;h({type:'chat.error',payload:{message:err?.message||'Unknown error',code:'CHAT_ERROR'}}as ExtensionMessage)}
-  finally{ac=null;h({type:'chat.done',payload:{usage:{inputTokens:0,outputTokens:0}}}as ExtensionMessage)}
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return;
+    h({ type: 'chat.error', payload: { message: err?.message || 'Unknown error', code: 'CHAT_ERROR' } } as ExtensionMessage);
+  } finally {
+    ac = null;
+    h({ type: 'chat.done', payload: { usage: { inputTokens: 0, outputTokens: 0 } } } as ExtensionMessage);
+  }
 }
