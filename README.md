@@ -1,182 +1,151 @@
-# BytePilot - VS Code AI 编程助手
+# BytePilot - AI 编程助手
 
-[English](https://github.com/hjy-2004/bytepilot-vscode/blob/master/README_EN.md)
+[English](./README_EN.md)
 
-类 Cursor 的 AI 编程助手，完全运行在 VS Code 中。支持 60+ AI 供应商预设（来自 cc-switch）、内联代码补全、文件编辑、终端命令、可视化 diff 审批、多会话管理。
+类 Cursor 的 AI 编程助手，支持 **VS Code 插件**和 **Tauri 桌面端**双平台。70-80% 核心代码共享于 `@bytepilot/core`。支持 60+ AI 供应商预设、内联代码补全、文件编辑、可视化 diff 审批、多会话管理。
+
+## 平台
+
+| 平台 | 安装包 | 大小 |
+|------|--------|------|
+| VS Code 插件 | `.vsix` | ~1.3 MB |
+| Windows 桌面 | `.exe` (Tauri) | ~14 MB |
+| macOS 桌面 | `.dmg` (Tauri) | ~10 MB |
+| Linux 桌面 | `.deb` / `.AppImage` (Tauri) | ~8 MB |
 
 ## 功能
 
-- **Chat** — 侧边栏 AI 对话，流式响应，AI 自主决定何时停止
+- **Chat** — AI 对话，流式响应，AI 自主决定何时停止
 - **Inline Completion** — 输入停顿自动触发灰色补全，Tab 接受
 - **Visual Diff & Approval** — 文件编辑前显示可视化 diff，内联审批（Approve/Reject）
 - **File Editing** — 精准 `old_string → new_string` 替换（Claude Code 风格）
 - **Tool System** — 8 个内置工具：read / write / edit / search / list / command / diagnostics / diff
-- **Multi-Provider** — 60+ 供应商预设，完整支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama，以及 Kimi / 智谱 / MiniMax / 阶跃星辰 / 火山方舟 / OpenRouter / SiliconFlow 等
+- **Multi-Provider** — 60+ 供应商预设，支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama / Kimi / 智谱 / MiniMax / 阶跃星辰 / 火山方舟 / OpenRouter / SiliconFlow 等
 - **Provider Categories** — 供应商按 5 大分类展示（官方 / 国产官方 / 聚合商 / 第三方 / 云服务商）
-- **Model Fetching** — 点击 🔄 一键从供应商 API 拉取实时模型列表（支持 OpenAI 和 Gemini 格式）
-- **Per-Provider API Key** — 每个供应商独立存储 API key，切换供应商自动匹配，互不覆盖
-- **Slash Commands `/`** — 输入 `/` 弹出命令菜单（`/clear` `/config` `/sessions` `/rules` `/help`）
-- **Input History** — 聊天输入框按 `↑`/`↓` 键浏览历史消息（最多 50 条）
-- **Image Paste & Upload** — 聊天输入框粘贴图片或点击按钮本地上传
-- **Semantic Search** — BM25 代码搜索引擎，`search_files` 支持 `semantic: true` 相关性排序
-- **Project Rules** — 工作区根目录放置 `.bytepilotrules` 文件，自动注入 AI system prompt
-- **Auto Config** — 首次启动自动读取 `.claude/settings.json`，零配置
-- **Multi-Session** — JSONL 持久化，创建/切换/删除会话，工具调用和 diff 数据完整恢复
-- **Incremental Saving** — 每条工具结果即时写入磁盘，崩溃不丢数据
-- **Model Settings** — 点击标题栏模型标签，可视化切换 Provider / Model / Base URL / API Key
-- **Smart API Routing** — 自动检测 API 协议（Anthropic / OpenAI / Google / OpenAI 兼容），16 条 URL 匹配规则
-- **Structured Logging** — 统一 BytePilot 输出频道，记录 AI 请求/工具调用/API 详情/会话诊断
-- **@file References** — 输入 `@文件名` 自动搜索工作区文件，选中后附带文件内容作为上下文
+- **Model Fetching** — 点击 🔄 一键从供应商 API 拉取实时模型列表
+- **Per-Provider API Key** — 每个供应商独立存储 API key
+- **Slash Commands `/`** — 输入 `/` 弹出命令菜单
+- **Input History** — `↑`/`↓` 键浏览历史消息（最多 50 条）
+- **Image Paste & Upload** — 粘贴图片或点击按钮本地上传
+- **Semantic Search** — BM25 代码搜索引擎
+- **Project Rules** — `.bytepilotrules` 自动注入 AI system prompt
+- **Auto Config** — 首次启动自动读取 `.claude/settings.json`
+- **Multi-Session** — JSONL 持久化，创建/切换/删除会话
+- **Structured Logging** — 统一日志（桌面端支持文件日志 `%APPDATA%/BytePilot/logs/`）
+- **Cross-Platform** — 70%+ 代码在 VS Code 和桌面端之间共享
 
 ## 快速开始
 
-1. `Ctrl+Shift+P` → **Open AI Chat**，或点击左侧活动栏机器人图标
-2. 已安装 Claude Code 则自动导入配置
-3. 否则点击模型标签 → Custom → 填写 Provider / Model / API Key
+### VS Code 插件
+
+1. 从 [Releases](https://github.com/hjy-2004/bytepilot-vscode/releases) 下载 `.vsix`
+2. `Ctrl+Shift+P` → **Extensions: Install from VSIX** → 选择文件
+3. 点击左侧活动栏机器人图标 → 配置 Provider / API Key
 4. 开始对话
 
-## 安装
+### 桌面端
 
-### 直接安装（推荐）
+从 [Releases](https://github.com/hjy-2004/bytepilot-vscode/releases) 下载对应平台安装包，双击安装。
 
-从 [Releases](https://github.com/hjy-2004/bytepilot-vscode/releases) 下载最新的 `.vsix` 文件，然后在 VS Code 中：
+或从源码运行：
 
-`Ctrl+Shift+P` → **Extensions: Install from VSIX** → 选择下载的文件
+```bash
+# 安装 Rust: https://rustup.rs
+# 然后：
+git clone https://github.com/hjy-2004/bytepilot-vscode.git
+cd bytepilot-vscode
+npm install
+npm run build:webview
+cd packages/tauri-app && npm install && npm run dev
+```
 
-### 从源码
+## 从源码构建
 
 ```bash
 git clone https://github.com/hjy-2004/bytepilot-vscode.git
 cd bytepilot-vscode
+
+# VS Code 插件
 npm install
-cd webview-ui && npm install && cd ..
-npm run build
+npm run build            # 构建 core + extension + webview
+npx vsce package         # 打包 .vsix
+
+# Tauri 桌面端
+npm run build:webview
+cd packages/tauri-app && npm install && npm run build
 ```
 
-用 VS Code 打开文件夹，**F5** 启动。
-
-### VSIX 打包
-
-```bash
-npx vsce package
-```
-
-## 设置项
-
-| 设置 | 默认 | 说明 |
-|------|------|------|
-| `aiCodingAgent.provider` | `anthropic` | 厂商（anthropic/openai/deepseek/google/azure-openai/ollama/openai-compatible） |
-| `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | 对话模型 |
-| `aiCodingAgent.completionModel` | (空) | 补全模型（空=同对话） |
-| `aiCodingAgent.baseURL` | (空) | 自定义 API 地址 |
-| `aiCodingAgent.temperature` | `0.7` | 创造性 |
-| `aiCodingAgent.maxTokens` | `4096` | 响应上限 |
-| `aiCodingAgent.thinkingBudget` | `4096` | 扩展思考预算（0=关闭） |
-| `aiCodingAgent.maxAgentSteps` | `500` | Agent 循环安全上限 |
-| `aiCodingAgent.toolApprovalLevel` | `writeOnly` | 审批级别: always / writeOnly / never |
-| `aiCodingAgent.completionsEnabled` | `true` | 启用补全 |
-| `aiCodingAgent.completionDebounceMs` | `300` | 补全延迟 |
-| `aiCodingAgent.completionTemperature` | `0.0` | 补全确定性 |
-| `aiCodingAgent.completionMaxTokens` | `256` | 补全上限 |
-
-## 项目规则（.bytepilotrules）
-
-在工作区根目录创建 `.bytepilotrules` 文件，内容会在每次对话时自动注入 AI system prompt。示例：
-
-```
-- 所有函数都要用 JSDoc 注释
-- 使用单引号，不用双引号
-- 缩进用 2 个空格
-- 组件文件使用 PascalCase 命名
-```
-
-聊天面板顶部会显示 "Rules active" 标签表示规则已加载。
-
-## 命令
-
-| 命令 | 说明 |
-|------|------|
-| `Open AI Chat` | 打开聊天 |
-| `New AI Chat Session` | 新建会话 |
-| `Configure AI Provider` | 配置厂商和密钥 |
-| `Test AI Provider Connection` | 测试连接 |
-| `Import Config from Claude/Cursor/Other` | 导入配置 |
-| `Reset Configuration` | 重置设置 |
-| `Show Current Configuration` | 诊断 |
-| `Explain Selected Code` | 解释代码 |
-| `Fix Selected Code` | 修复代码 |
-| `Generate Code` | 生成代码 |
+用 VS Code 打开文件夹，**F5** 启动插件调试。
 
 ## 架构
 
 ```
 extension_plugin/
-├── .github/workflows/      # CI/CD (lint, build, test, release)
-├── src/                    # 扩展宿主 (TypeScript)
-│   ├── extension.ts        # 入口
-│   ├── ai/                 # AI 核心（agent-loop, api-client, chat-engine, model-fetcher）
-│   ├── tools/              # 8 个工具（含 diff_file, execute_command 静默模式）
-│   ├── chat/               # 聊天面板、路由、JSONL 历史持久化
-│   ├── context/            # 上下文收集器（.bytepilotrules + BM25 语义搜索）
-│   ├── completion/         # InlineCompletionItemProvider (多 provider FIM)
-│   ├── config/             # 设置、校验、导入、供应商预设（60+ 供应商）
-│   └── utils/              # ai-logger, diff-helper, token-counter
-├── webview-ui/             # React 聊天界面 (Vite + Zustand, / 命令 + 输入历史 + 模型获取)
-├── eslint.config.mjs       # ESLint flat config
-└── esbuild.config.mjs      # 扩展构建
+├── packages/
+│   ├── core/                      # @bytepilot/core — 共享核心（TS, tsc 编译）
+│   │   ├── ai/                    # agent-loop, api-client, stream-bridge, ...
+│   │   ├── tools/                 # registry, diff-file, definitions
+│   │   ├── session/               # JSONL 持久化
+│   │   ├── search/                # BM25 语义搜索
+│   │   ├── config/                # 60+ 供应商预设
+│   │   ├── types/                 # IPC, AI, providers, platform 接口
+│   │   └── platform/              # ILogger, IFileSystem, IConfigStore, ...
+│   │
+│   └── tauri-app/                 # @bytepilot/tauri-app — Tauri 桌面端
+│       ├── src/                   # TS 平台适配器 (IFileSystem, IConfigStore, ...)
+│       ├── src-tauri/             # Rust 后端 (FS, Shell, Config, Logging 命令)
+│       └── src-tauri/src/commands/  # fs.rs, config.rs, shell.rs, log.rs
+│
+├── src/                           # VS Code 插件（shim → @bytepilot/core）
+│   ├── platform/                  # VS Code 适配器 (VSCodeFileSystem, VSCodeConfigStore, ...)
+│   ├── ai/                        # chat-engine, completion-engine (通过 IConfigStore)
+│   ├── tools/                     # 7 个平台相关工具实现
+│   ├── chat/                      # panel.ts, router.ts
+│   ├── completion/                # InlineCompletionItemProvider
+│   └── extension.ts               # 入口
+│
+├── webview-ui/                    # 共享 React UI (Vite + Zustand)
+│   ├── platform/                  # IPlatformAdapter (vscode / tauri)
+│   ├── styles/                    # theme-vscode.css / theme-desktop.css
+│   └── components/                # ChatContainer, DiffView, ModelSelector, ...
+│
+├── turbo.json                     # Turborepo 并行构建
+├── esbuild.config.mjs             # 插件构建
+└── .github/workflows/             # CI/CD (typecheck + lint + build + desktop)
 ```
 
 ## 技术栈
 
 | 层 | 技术 |
 |------|------|
-| 扩展宿主 | TypeScript + VS Code API |
-| AI 引擎 | 多 provider 客户端（Anthropic Messages / OpenAI Chat / Ollama 原生 API，SSE 流式） |
-| Agent 循环 | 手动控制，AI 自主决定停止，500 步安全帽 |
-| 工具审批 | 内联 diff 视图 + Approve/Reject，支持 edit_file/write_file 预览 |
-| 内联补全 | DeepSeek FIM Beta + Ollama / OpenAI chat-based FIM |
-| 聊天界面 | React 18 + Zustand + react-markdown |
-| Diff | `diff` npm 库（unified diff + 行号 + 折叠） |
-| 日志 | 统一 BytePilot 输出频道（AI 请求/工具调用/API 参数） |
-| 构建 | esbuild (扩展) + Vite (WebView)，`npm run build` 一键编译 |
-| 存储 | JSONL (`~/.ai-coding-agent/projects/`) |
+| VS Code 插件 | TypeScript + VS Code API |
+| Tauri 桌面 | Rust + Tauri v2 (14MB 二进制) |
+| AI 引擎 | 多协议 HTTP 客户端 (Anthropic/OpenAI/Gemini/Ollama, SSE 流式) |
+| Agent 循环 | 手动控制，AI 自主停止，500 步安全帽 |
+| UI | React 18 + Zustand + react-markdown, CSS 语义令牌 |
+| 构建 | Turborepo + esbuild (插件) + Vite (WebView) + Cargo (桌面) |
+| CI/CD | GitHub Actions (typecheck, lint, 三平台桌面构建, VS Code Marketplace 发布) |
 
-## 支持的厂商
+## 桌面端日志
 
-### 官方
+桌面端日志写入 `%APPDATA%\BytePilot\logs\bytepilot.log`，超过 1MB 自动轮转。
 
-| 厂商 | 对话 | 补全 | 工具 | 说明 |
-|------|------|------|------|------|
-| Anthropic (Claude) | ✅ | ✅ (chat FIM) | ✅ | 原生 API + prompt caching + extended thinking |
-| OpenAI (GPT) | ✅ | ✅ (chat FIM) | ✅ | 原生 API |
-| DeepSeek | ✅ | ✅ (`/beta` FIM) | ✅ | OpenAI 兼容端点，自动格式路由 |
-| Google (Gemini) | ✅ | ✅ (chat FIM) | ✅ | 通过 `@ai-sdk/google` |
-| Azure OpenAI | ✅ | ✅ (chat FIM) | ✅ | 自定义 resource + deployment |
-| Ollama | ✅ | ✅ (FIM) | ✅ | 本地 LLM，/api/chat 原生格式 |
+或在 Tauri 窗口按 **F12** 打开 DevTools → Console 查看实时日志。
 
-### 国产官方 & 聚合商（内置预设，来自 cc-switch）
+## 设置项
 
-| 供应商 | 说明 |
-|--------|------|
-| Kimi (Moonshot) | `api.moonshot.cn/v1`，kimi-k2.7-code |
-| Kimi For Coding | `api.kimi.com/coding`，Anthropic 兼容端点 |
-| 智谱 GLM | `open.bigmodel.cn` / `api.z.ai`，glm-5.1 |
-| MiniMax | `api.minimaxi.com/v1` / `api.minimax.io/v1` |
-| 阶跃星辰 (StepFun) | `api.stepfun.com/step_plan/v1` |
-| 火山方舟 AgentPlan | `ark.cn-beijing.volces.com/api/coding/v3` |
-| 豆包 Seed | `ark.cn-beijing.volces.com/api/v3` |
-| 百炼 (阿里) | `dashscope.aliyuncs.com/compatible-mode/v1` |
-| 百度千帆 | `qianfan.baidubce.com/anthropic/coding` |
-| 小米 MiMo | `api.xiaomimimo.com/v1` |
-| OpenRouter | 聚合商，多模型路由 |
-| SiliconFlow | 国产聚合商 |
-| 省算云 / AiHubMix / CherryIN 等 | 社区供应商 |
-
-完整列表见 ModelSelector 下拉菜单（共 21 个）。
-
-### 自动 API 格式检测
-
-插件根据 baseURL 自动判断 API 协议（Anthropic Messages / OpenAI Chat / Google Gemini / OpenAI 兼容），无需手动配置。支持 9 种常见 URL 兼容后缀的自动剥离（`/anthropic`、`/api/anthropic`、`/apps/anthropic`、`/api/coding`、`/api/claudecode`、`/step_plan`、`/claude`、`/coding`）。
+| 设置 | 默认 | 说明 |
+|------|------|------|
+| `aiCodingAgent.provider` | `anthropic` | 厂商 |
+| `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | 对话模型 |
+| `aiCodingAgent.completionModel` | (空) | 补全模型 |
+| `aiCodingAgent.baseURL` | (空) | 自定义 API 地址 |
+| `aiCodingAgent.temperature` | `0.7` | 创造性 |
+| `aiCodingAgent.maxTokens` | `4096` | 响应上限 |
+| `aiCodingAgent.thinkingBudget` | `4096` | 扩展思考预算（0=关闭） |
+| `aiCodingAgent.maxAgentSteps` | `500` | Agent 循环安全上限 |
+| `aiCodingAgent.toolApprovalLevel` | `writeOnly` | 审批级别 |
+| `aiCodingAgent.completionsEnabled` | `true` | 启用补全 |
 
 ## License
 
