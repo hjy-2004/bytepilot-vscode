@@ -5,9 +5,10 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      '@bytepilot/core': path.resolve(__dirname, '..', 'packages', 'core', 'src'),
-    },
+    alias: [
+      { find: /^@bytepilot\/core\/(.+)/, replacement: path.resolve(__dirname, '..', 'packages', 'core', 'src', '$1') },
+      { find: '@bytepilot/core', replacement: path.resolve(__dirname, '..', 'packages', 'core', 'src') },
+    ],
   },
   build: {
     outDir: 'dist',

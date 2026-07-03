@@ -7,6 +7,8 @@
  */
 import type { IPlatformAdapter } from './types';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
+import { streamChat } from '@bytepilot/core/ai/api-client';
+import type { Message } from '@bytepilot/core/ai/message-types';
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -50,16 +52,11 @@ const DEFAULT_CONFIG: AppConfig = {
 let _config: AppConfig = { ...DEFAULT_CONFIG };
 let _apiKeys: StoredKey[] = [];
 let _sessions: Array<{ id: string; title: string; messageCount: number; updatedAt: number }> = [];
-let _chatHistory: ChatMessage[] = [];
+let _chatHistory: Message[] = [];
 let _abortController: AbortController | null = null;
 let _workspaceRoot: string = '';
 let _projectFiles: ProjectEntry[] = [];
 let _rulesContent: string = '';
-
-interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
 
 function buildSystemPrompt(): string {
   let prompt = `You are BytePilot, an AI coding assistant running as a desktop app. You help developers write, understand, and debug code.
@@ -102,88 +99,6 @@ Always read a file before editing it. Prefer edit_file over write_file for chang
   return prompt;
 }
 
-// ── Minimal AI Chat (fetch + SSE) ────────────────────────────────────
-
-async function callAI(
-  provider: string,
-  baseURL: string,
-  apiKey: string,
-  model: string,
-  messages: ChatMessage[],
-  onToken: (text: string) => void,
-  signal?: AbortSignal,
-): Promise<string> {
-  const base = baseURL.replace(/\/+$/, '');
-  const isOllama = provider === 'ollama';
-
-  if (isOllama) {
-    // Ollama /api/chat (non-streaming for simplicity)
-    const res = await fetch(`${base}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: false }),
-      signal,
-    });
-    const data = await res.json() as any;
-    const text = data.message?.content || '';
-    if (text) onToken(text);
-    return text;
-  }
-
-  // OpenAI-compatible /chat/completions with SSE streaming
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
-  };
-
-  const res = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: true,
-      max_tokens: 4096,
-    }),
-    signal,
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API error ${res.status}: ${err.substring(0, 300)}`);
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  let fullText = '';
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data:')) continue;
-      const data = trimmed.slice(5).trim();
-      if (data === '[DONE]') continue;
-      try {
-        const json = JSON.parse(data);
-        const delta = json.choices?.[0]?.delta?.content || '';
-        if (delta) {
-          fullText += delta;
-          onToken(delta);
-        }
-      } catch { /* skip malformed chunks */ }
-    }
-  }
-
-  return fullText;
-}
 
 // ── Tauri API ───────────────────────────────────────────────────────
 
@@ -686,14 +601,21 @@ async function handleChatSend(content: string): Promise<void> {
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
       console.log(`[TauriAdapter] Chat turn ${turn + 1}/${MAX_TOOL_TURNS}`);
       const sysPrompt = buildSystemPrompt();
-      const messages: ChatMessage[] = [
+      const messages: Message[] = [
         { role: 'system', content: sysPrompt },
         ..._chatHistory,
       ];
 
+      const allMessages: Message[] = [
+        { role: 'system', content: buildSystemPrompt() },
+        ..._chatHistory,
+      ];
+
       let fullText = '';
-      await callAI(
-        _config.provider, baseURL, apiKey, _config.chatModel, messages,
+      await streamChat(
+        { apiKey, baseURL, model: _config.chatModel, maxTokens: _config.maxTokens || 4096, thinkingBudget: 0, provider: _config.provider },
+        allMessages,
+        [],
         (token: string) => {
           fullText += token;
           if (_handler) _handler({ type: 'chat.token', payload: { text: token } } as ExtensionMessage);
