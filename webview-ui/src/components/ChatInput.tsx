@@ -268,7 +268,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
           {imageAttachments.map((img, idx) => (
             <div key={idx} style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--bytepilot-border)' }}>
               <img src={img.content} alt="pasted" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              <span onClick={() => removeImage(idx)} style={{ position: 'absolute', top: '1px', right: '3px', cursor: 'pointer', color: '#fff', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', lineHeight: 1 }}>×</span>
+              <span onClick={() => removeImage(idx)} style={{ position: 'absolute', top: '1px', right: '3px', cursor: 'pointer', color: 'var(--bytepilot-image-overlay-fg)', background: 'var(--bytepilot-image-overlay-bg)', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', lineHeight: 1 }}>×</span>
             </div>
           ))}
         </div>

@@ -58,25 +58,25 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
   let barBg: string;
   if (isPending) {
     icon = '\u23F3'; label = 'Needs approval';
-    barBg = 'rgba(204,167,0,0.1)';
+    barBg = 'var(--bytepilot-status-pending-bg)';
   } else if (isRunning) {
     icon = '\u23F3'; label = `Running... ${formatElapsed(elapsed)}`;
-    barBg = 'rgba(0,122,204,0.08)';
+    barBg = 'var(--bytepilot-status-running-bg)';
   } else if (isDone) {
     icon = '\u2705'; label = 'Completed';
-    barBg = 'rgba(0,128,0,0.06)';
+    barBg = 'var(--bytepilot-status-done-bg)';
   } else if (isError) {
     icon = '\u274C'; label = 'Failed';
-    barBg = 'rgba(200,0,0,0.06)';
+    barBg = 'var(--bytepilot-status-error-bg)';
   } else {
     icon = '\u23F3'; label = '';
     barBg = 'var(--bytepilot-bg-primary)';
   }
 
-  const borderColor = isPending ? '#cca700'
-    : isRunning ? 'rgba(0,122,204,0.5)'
-    : isDone ? 'rgba(0,128,0,0.3)'
-    : isError ? 'rgba(200,0,0,0.4)'
+  const borderColor = isPending ? 'var(--bytepilot-status-pending-border)'
+    : isRunning ? 'var(--bytepilot-status-running-border)'
+    : isDone ? 'var(--bytepilot-status-done-border)'
+    : isError ? 'var(--bytepilot-status-error-border)'
     : 'var(--bytepilot-border)';
 
   return (

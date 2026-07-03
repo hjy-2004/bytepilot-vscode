@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useMemo } from 'react';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { MessageBubble } from './MessageBubble';
 import type { ChatMessage } from '../state/chat-store';
 
@@ -34,30 +35,63 @@ const WorkingIndicator: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+/** Footer component rendered below the list during streaming */
+const StreamingFooter: React.FC<{
+  streamingText: string;
+  isStreaming: boolean;
+  statusText: string;
+}> = React.memo(({ streamingText, isStreaming, statusText }) => {
+  if (!isStreaming) return null;
+
+  return (
+    <div style={{ paddingBottom: '4px' }}>
+      {streamingText && (
+        <MessageBubble
+          message={{
+            id: 'streaming',
+            role: 'assistant',
+            content: streamingText,
+            timestamp: Date.now(),
+          }}
+          isStreaming
+        />
+      )}
+      {statusText && !streamingText && (
+        <WorkingIndicator text={statusText} />
+      )}
+      {statusText && streamingText && (
+        <WorkingIndicator text={statusText} />
+      )}
+    </div>
+  );
+});
+
 export const MessageList: React.FC<MessageListProps> = React.memo(({
   messages,
   streamingText,
   isStreaming,
 }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // Find pending approval card to scroll to
-  const pendingMsgId = messages.find(m =>
-    m.toolCalls?.some(tc => tc.status === 'pending_approval')
-  )?.id;
-
-  useEffect(() => {
-    if (pendingMsgId) {
-      const el = document.getElementById(`msg-${pendingMsgId}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } else {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const pendingMsgIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].toolCalls?.some(tc => tc.status === 'pending_approval')) {
+        return i;
+      }
     }
-  }, [messages, streamingText, pendingMsgId]);
+    return -1;
+  }, [messages]);
 
   // Determine what status to show during streaming
-  const runningTools = messages.flatMap(m => m.toolCalls || []).filter(tc => tc.status === 'running');
-  const hasPendingApproval = messages.some(m => m.toolCalls?.some(tc => tc.status === 'pending_approval'));
+  const runningTools = useMemo(
+    () => messages.flatMap(m => m.toolCalls || []).filter(tc => tc.status === 'running'),
+    [messages],
+  );
+  const hasPendingApproval = useMemo(
+    () => messages.some(m => m.toolCalls?.some(tc => tc.status === 'pending_approval')),
+    [messages],
+  );
   const hasRunningTools = runningTools.length > 0;
 
   let statusText = 'Thinking...';
@@ -69,41 +103,56 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
       ? `Running ${runningTools.length} tools...`
       : `Running: ${toolName}...`;
   } else if (streamingText.length > 0) {
-    statusText = ''; // Streaming text is shown instead
+    statusText = '';
   }
 
+  // Scroll to pending approval when it appears
+  React.useEffect(() => {
+    if (pendingMsgIndex >= 0 && virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({
+        index: pendingMsgIndex,
+        align: 'center',
+        behavior: 'smooth',
+      });
+    }
+  }, [pendingMsgIndex]);
+
+  // Auto-follow new content only when user is at the bottom
+  // If there's a pending approval, don't auto-follow (stay on the approval card)
+  const followOutput = useCallback(
+    (isAtBottom: boolean) => {
+      if (pendingMsgIndex >= 0) return false;
+      return isAtBottom;
+    },
+    [pendingMsgIndex],
+  );
+
+  const itemContent = useCallback(
+    (_index: number, msg: ChatMessage) => (
+      <MessageBubble message={msg} />
+    ),
+    [],
+  );
+
+  // Footer component with streaming content
+  const Footer = useCallback(() => (
+    <StreamingFooter
+      streamingText={streamingText}
+      isStreaming={isStreaming}
+      statusText={statusText}
+    />
+  ), [streamingText, isStreaming, statusText]);
+
   return (
-    <div className="message-list">
-      {messages.map((msg) => (
-        <div key={msg.id} id={`msg-${msg.id}`}>
-          <MessageBubble message={msg} />
-        </div>
-      ))}
-
-      {/* Streaming text bubble */}
-      {isStreaming && streamingText && (
-        <MessageBubble
-          message={{
-            id: 'streaming',
-            role: 'assistant',
-            content: streamingText,
-            timestamp: Date.now(),
-          }}
-          isStreaming
-        />
-      )}
-
-      {/* Status indicator: show when streaming but no text, or when tools are executing */}
-      {isStreaming && statusText && !streamingText && (
-        <WorkingIndicator text={statusText} />
-      )}
-
-      {/* Show status even during streaming text if there are running tools */}
-      {isStreaming && statusText && streamingText && hasRunningTools && (
-        <WorkingIndicator text={statusText} />
-      )}
-
-      <div ref={bottomRef} />
-    </div>
+    <Virtuoso
+      ref={virtuosoRef}
+      data={messages}
+      itemContent={itemContent}
+      followOutput={followOutput}
+      atBottomThreshold={80}
+      components={{ Footer }}
+      style={{ flex: 1 }}
+      increaseViewportBy={{ top: 200, bottom: 200 }}
+    />
   );
 });

@@ -41,4 +41,28 @@
   --bytepilot-error-fg:               var(--vscode-inputValidation-errorForeground);
   --bytepilot-progress-bg:            var(--vscode-progressBar-background);
   --bytepilot-accent:                 var(--vscode-terminal-ansiGreen);
+
+  /* Diff colors */
+  --bytepilot-diff-add-fg:            var(--vscode-terminal-ansiGreen, #4ac26b);
+  --bytepilot-diff-remove-fg:         var(--vscode-terminal-ansiRed, #f14c4c);
+  --bytepilot-diff-add-bg:            var(--vscode-diffEditor-insertedTextBackground, rgba(74, 194, 107, 0.15));
+  --bytepilot-diff-remove-bg:         var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.15));
+
+  /* Tool call status colors */
+  --bytepilot-status-pending-fg:      #cca700;
+  --bytepilot-status-pending-bg:      rgba(204, 167, 0, 0.1);
+  --bytepilot-status-pending-border:  #cca700;
+  --bytepilot-status-running-fg:      var(--vscode-textLink-foreground, #007acc);
+  --bytepilot-status-running-bg:      rgba(0, 122, 204, 0.08);
+  --bytepilot-status-running-border:  rgba(0, 122, 204, 0.5);
+  --bytepilot-status-done-fg:         var(--vscode-terminal-ansiGreen, #4ac26b);
+  --bytepilot-status-done-bg:         rgba(0, 128, 0, 0.06);
+  --bytepilot-status-done-border:     rgba(0, 128, 0, 0.3);
+  --bytepilot-status-error-fg:        var(--vscode-terminal-ansiRed, #f14c4c);
+  --bytepilot-status-error-bg:        rgba(200, 0, 0, 0.06);
+  --bytepilot-status-error-border:    rgba(200, 0, 0, 0.4);
+
+  /* Image overlay */
+  --bytepilot-image-overlay-bg:       rgba(0, 0, 0, 0.6);
+  --bytepilot-image-overlay-fg:       #ffffff;
 }

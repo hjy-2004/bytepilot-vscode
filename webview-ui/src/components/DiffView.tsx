@@ -68,8 +68,8 @@ const DiffHeader: React.FC<{ fileName: string; stats: UnifiedDiff['stats'] }> = 
   }}>
     <span>{fileName}</span>
     <span style={{ fontWeight: 400, fontSize: '11px' }}>
-      <span style={{ color: '#4ac26b', marginRight: '4px' }}>+{stats.additions}</span>
-      <span style={{ color: '#f14c4c' }}>-{stats.deletions}</span>
+      <span style={{ color: 'var(--bytepilot-diff-add-fg)', marginRight: '4px' }}>+{stats.additions}</span>
+      <span style={{ color: 'var(--bytepilot-diff-remove-fg)' }}>-{stats.deletions}</span>
     </span>
   </div>
 );
@@ -176,16 +176,16 @@ function renderLines(
     const line = lines[i];
     const bg =
       line.type === 'added'
-        ? 'rgba(74,194,107,0.15)'
+        ? 'var(--bytepilot-diff-add-bg)'
         : line.type === 'removed'
-          ? 'rgba(241,76,76,0.15)'
+          ? 'var(--bytepilot-diff-remove-bg)'
           : 'transparent';
     const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
     const prefixColor =
       line.type === 'added'
-        ? '#4ac26b'
+        ? 'var(--bytepilot-diff-add-fg)'
         : line.type === 'removed'
-          ? '#f14c4c'
+          ? 'var(--bytepilot-diff-remove-fg)'
           : 'var(--bytepilot-fg-secondary)';
 
     result.push(
