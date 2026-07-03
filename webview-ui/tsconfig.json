@@ -13,7 +13,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "paths": {
-      "@bytepilot/core": ["../packages/core/src"]
+      "@bytepilot/core": ["../packages/core/src"],
+      "@bytepilot/core/*": ["../packages/core/src/*"]
     }
   },
   "include": ["src"]
