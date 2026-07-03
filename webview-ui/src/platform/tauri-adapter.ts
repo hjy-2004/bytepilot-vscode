@@ -666,24 +666,39 @@ async function handleChatSend(content: string): Promise<void> {
       ];
 
       let fullText = '';
+      let bufferingTool = false;
       await streamChat(
         { apiKey, baseURL, model: _config.chatModel, maxTokens: _config.maxTokens || 4096, thinkingBudget: 0, provider: _config.provider },
         allMessages,
         [],
         (token: string) => {
           fullText += token;
-          if (_handler) _handler({ type: 'chat.token', payload: { text: token } } as ExtensionMessage);
+          // Detect start of tool block — stop forwarding tokens to UI
+          if (!bufferingTool && fullText.includes('\n```tool\n')) {
+            bufferingTool = true;
+          }
+          // Only forward non-tool tokens to UI
+          if (!bufferingTool) {
+            if (_handler) _handler({ type: 'chat.token', payload: { text: token } } as ExtensionMessage);
+          }
         },
         _abortController.signal,
       );
 
+      // Strip tool blocks from displayed text, keep clean text for history
+      const cleanText = fullText.replace(/```tool\n[\s\S]*?```/g, '').trim();
+
       // Parse tool calls
       const toolCalls = parseToolCalls(fullText);
       if (toolCalls.length === 0) {
-        // No tools — final response
-        _chatHistory.push({ role: 'assistant', content: fullText });
+        _chatHistory.push({ role: 'assistant', content: cleanText });
         if (_handler) _handler({ type: 'chat.done', payload: { usage: { inputTokens: 0, outputTokens: 0 } } } as ExtensionMessage);
         return;
+      }
+
+      // Update UI with clean text (replace the streamed tokens)
+      if (_handler && bufferingTool) {
+        _handler({ type: 'chat.token', payload: { text: '\n' } } as ExtensionMessage);
       }
 
       // Execute tools with structured messages (for UI diff rendering)
@@ -744,10 +759,10 @@ async function handleChatSend(content: string): Promise<void> {
         }
       }
 
-      // Feed tool results back to AI
+      // Feed tool results back to AI (clean text only)
       _chatHistory.push({
         role: 'assistant',
-        content: fullText + '\n\n' + toolResults.map(r => `\`\`\`tool-result\n${r}\n\`\`\``).join('\n'),
+        content: cleanText + '\n\n' + toolResults.map(r => `\`\`\`tool-result\n${r}\n\`\`\``).join('\n'),
       });
     }
 
