@@ -10,6 +10,35 @@ import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
 import { streamChat } from '@bytepilot/core/ai/api-client';
 import type { Message } from '@bytepilot/core/ai/message-types';
 
+// ── Mini diff generator (avoid importing diff npm package) ──────────
+
+interface DiffLine { type: 'context' | 'added' | 'removed'; oldLineNumber?: number; newLineNumber?: number; content: string; }
+interface DiffHunk { oldStart: number; oldLines: number; newStart: number; newLines: number; lines: DiffLine[]; }
+interface LocalDiff { fileName: string; stats: { additions: number; deletions: number }; hunks: DiffHunk[]; }
+
+function simpleDiff(fileName: string, original: string, modified: string): LocalDiff | undefined {
+  if (original === modified) return undefined;
+  const origLines = original.split('\n');
+  const modLines = modified.split('\n');
+  const additions = Math.max(0, modLines.length - origLines.length);
+  const deletions = Math.max(0, origLines.length - modLines.length);
+  const maxLen = Math.max(origLines.length, modLines.length);
+  const lines: DiffLine[] = [];
+  let oldNum = 1, newNum = 1;
+  for (let i = 0; i < maxLen; i++) {
+    const ol = i < origLines.length ? origLines[i] : undefined;
+    const ml = i < modLines.length ? modLines[i] : undefined;
+    if (ol === ml) {
+      if (ol !== undefined) lines.push({ type: 'context', oldLineNumber: oldNum++, newLineNumber: newNum++, content: ol });
+    } else {
+      if (ol !== undefined) { lines.push({ type: 'removed', oldLineNumber: oldNum++, content: ol }); }
+      if (ml !== undefined) { lines.push({ type: 'added', newLineNumber: newNum++, content: ml }); }
+    }
+  }
+  const hunk: DiffHunk = { oldStart: 1, oldLines: origLines.length, newStart: 1, newLines: modLines.length, lines };
+  return { fileName, stats: { additions, deletions }, hunks: [hunk] };
+}
+
 // ── State ───────────────────────────────────────────────────────────
 
 interface AppConfig {
@@ -415,6 +444,11 @@ async function loadWorkspaceContext(): Promise<void> {
   }
 }
 
+async function tryRead(relativePath: string, fallback: string): Promise<string> {
+  if (!_invoke) return fallback;
+  try { return await _invoke('cmd_read_file_workspace', { relativePath }) as string; } catch { return fallback; }
+}
+
 async function pickWorkspaceFolder(): Promise<void> {
   if (!_invoke) {
     // Fallback: try to re-init Tauri
@@ -652,17 +686,65 @@ async function handleChatSend(content: string): Promise<void> {
         return;
       }
 
-      // Execute tools
+      // Execute tools with structured messages (for UI diff rendering)
       console.log(`[TauriAdapter] Executing ${toolCalls.length} tool(s):`, toolCalls.map(t => t.tool));
       const toolResults: string[] = [];
+      let toolIndex = 0;
       for (const tc of toolCalls) {
-        if (_handler) _handler({ type: 'chat.token', payload: { text: `\n\n🔧 Running: ${tc.tool}(${Object.values(tc.args).join(', ')})...\n` } } as ExtensionMessage);
+        toolIndex++;
+        const toolId = `${Date.now()}-${toolIndex}`;
+        const displayName = tc.tool.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+        // Send tool call to UI
+        if (_handler) {
+          _handler({
+            type: 'chat.toolCall',
+            payload: { id: toolId, name: tc.tool, displayName, args: tc.args, needsApproval: false },
+          } as ExtensionMessage);
+        }
+
+        // For write/edit tools, try to compute a diff
+        let diff: LocalDiff | undefined;
+        if ((tc.tool === 'write_file' || tc.tool === 'edit_file') && tc.args.path) {
+          try {
+            const orig = await _invoke?.('cmd_read_file_workspace', { relativePath: tc.args.path }) as string | undefined;
+            const result = await executeTool(tc.tool, tc.args);
+            toolResults.push(`Tool: ${tc.tool}(${JSON.stringify(tc.args)}) → ${result}`);
+            if (orig !== undefined) {
+              const newContent = await _invoke?.('cmd_read_file_workspace', { relativePath: tc.args.path }) as string;
+              diff = simpleDiff(tc.args.path, orig, newContent);
+            }
+            // Send tool result
+            if (_handler) {
+              _handler({
+                type: 'chat.toolResult',
+                payload: { id: toolId, name: tc.tool, result, success: !result.startsWith('Error'), diff: diff as any },
+              } as ExtensionMessage);
+            }
+            continue;
+          } catch { /* fall through to normal execution */ }
+        }
+
         const result = await executeTool(tc.tool, tc.args);
         toolResults.push(`Tool: ${tc.tool}(${JSON.stringify(tc.args)}) → ${result}`);
-        if (_handler) _handler({ type: 'chat.token', payload: { text: result.substring(0, 500) + (result.length > 500 ? '\n...(truncated)' : '') } } as ExtensionMessage);
+
+        if (_handler) {
+          _handler({
+            type: 'chat.toolResult',
+            payload: { id: toolId, name: tc.tool, result, success: !result.startsWith('Error') },
+          } as ExtensionMessage);
+        }
+
+        // Send tool result to UI (with diff if available)
+        if (_handler) {
+          _handler({
+            type: 'chat.toolResult',
+            payload: { id: toolId, name: tc.tool, result, success: !result.startsWith('Error'), diff },
+          } as ExtensionMessage);
+        }
       }
 
-      // Feed tool results back to AI for another turn
+      // Feed tool results back to AI
       _chatHistory.push({
         role: 'assistant',
         content: fullText + '\n\n' + toolResults.map(r => `\`\`\`tool-result\n${r}\n\`\`\``).join('\n'),
