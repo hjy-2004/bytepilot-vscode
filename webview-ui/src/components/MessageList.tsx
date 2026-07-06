@@ -7,6 +7,8 @@ interface MessageListProps {
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
+  /** Passed through to MessageBubble — 'card' (VS Code) or 'flat' (desktop) */
+  bubbleVariant?: 'card' | 'flat';
 }
 
 /** Animated status indicator shown while the AI is working */
@@ -40,7 +42,8 @@ const StreamingFooter: React.FC<{
   streamingText: string;
   isStreaming: boolean;
   statusText: string;
-}> = React.memo(({ streamingText, isStreaming, statusText }) => {
+  bubbleVariant?: 'card' | 'flat';
+}> = React.memo(({ streamingText, isStreaming, statusText, bubbleVariant }) => {
   if (!isStreaming) return null;
 
   return (
@@ -54,9 +57,10 @@ const StreamingFooter: React.FC<{
             timestamp: Date.now(),
           }}
           isStreaming
-        />
-      )}
-      {statusText && !streamingText && (
+            variant={bubbleVariant}
+          />
+        )}
+        {statusText && !streamingText && (
         <WorkingIndicator text={statusText} />
       )}
       {statusText && streamingText && (
@@ -70,6 +74,7 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
   messages,
   streamingText,
   isStreaming,
+  bubbleVariant,
 }) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
@@ -129,9 +134,9 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
 
   const itemContent = useCallback(
     (_index: number, msg: ChatMessage) => (
-      <MessageBubble message={msg} />
+      <MessageBubble message={msg} variant={bubbleVariant} />
     ),
-    [],
+    [bubbleVariant],
   );
 
   // Footer component with streaming content
@@ -140,8 +145,9 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
       streamingText={streamingText}
       isStreaming={isStreaming}
       statusText={statusText}
+      bubbleVariant={bubbleVariant}
     />
-  ), [streamingText, isStreaming, statusText]);
+  ), [streamingText, isStreaming, statusText, bubbleVariant]);
 
   return (
     <Virtuoso

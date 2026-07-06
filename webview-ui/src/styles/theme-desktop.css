@@ -1,67 +1,94 @@
 /**
- * Desktop theme — Catppuccin Mocha inspired dark palette.
- * Used by the Tauri desktop app. Replace this file when building for desktop.
+ * Desktop theme — light, warm, layered.
+ *
+ * The main canvas is near-white. The sidebar carries a subtle warm stone
+ * tone that complements the white rather than blending into it.
+ * A single brass accent anchors the interactive elements.
+ *
+ * Used by the Tauri desktop app.
  */
 :root {
-  --bytepilot-font-family:            -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --bytepilot-font-size:              13px;
-  --bytepilot-editor-font-family:     'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-  --bytepilot-fg-primary:             #cdd6f4;
-  --bytepilot-fg-secondary:           #a6adc8;
-  --bytepilot-bg-primary:             #1e1e2e;
-  --bytepilot-bg-secondary:           #181825;
-  --bytepilot-border:                 #45475a;
-  --bytepilot-focus-border:           #89b4fa;
-  --bytepilot-input-bg:               #313244;
-  --bytepilot-input-fg:               #cdd6f4;
-  --bytepilot-input-border:           #585b70;
-  --bytepilot-btn-bg:                 #89b4fa;
-  --bytepilot-btn-fg:                 #1e1e2e;
-  --bytepilot-btn-hover:              #74c7ec;
-  --bytepilot-btn-secondary-bg:       #45475a;
-  --bytepilot-btn-secondary-fg:       #cdd6f4;
-  --bytepilot-btn-secondary-hover:    #585b70;
-  --bytepilot-badge-bg:               #45475a;
-  --bytepilot-badge-fg:               #cdd6f4;
-  --bytepilot-code-bg:                #11111b;
-  --bytepilot-blockquote-border:      #89b4fa;
-  --bytepilot-blockquote-bg:          rgba(137, 180, 250, 0.05);
-  --bytepilot-link-fg:                #89b4fa;
-  --bytepilot-scrollbar:              #585b70;
-  --bytepilot-scrollbar-hover:        #6c7086;
-  --bytepilot-titlebar-bg:            #11111b;
-  --bytepilot-dropdown-bg:            #313244;
-  --bytepilot-dropdown-fg:            #cdd6f4;
-  --bytepilot-dropdown-border:        #45475a;
-  --bytepilot-list-active-bg:         #45475a;
-  --bytepilot-list-active-fg:         #cdd6f4;
-  --bytepilot-list-hover-bg:          #313244;
-  --bytepilot-error-bg:               rgba(243, 139, 168, 0.15);
-  --bytepilot-error-fg:               #f38ba8;
-  --bytepilot-progress-bg:            #89b4fa;
-  --bytepilot-accent:                 #a6e3a1;
+  --bytepilot-font-family:            Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --bytepilot-font-size:              14px;
+  --bytepilot-editor-font-family:     'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
 
-  /* Diff colors */
-  --bytepilot-diff-add-fg:            #4ac26b;
-  --bytepilot-diff-remove-fg:         #f14c4c;
-  --bytepilot-diff-add-bg:            rgba(74, 194, 107, 0.15);
-  --bytepilot-diff-remove-bg:         rgba(241, 76, 76, 0.15);
+  /* ── Surface depth stack ──────────────── */
+  --bytepilot-bg-primary:             #fbfbfb;   /* page canvas — near white */
+  --bytepilot-bg-secondary:           #f4f1ec;   /* sidebar — warm stone, the "color" */
+  --bytepilot-input-bg:               #ffffff;   /* input — pure white, elevated */
+  --bytepilot-code-bg:                #f3f4f6;   /* code blocks — subtle gray */
+  --bytepilot-border:                 #e4e1db;   /* dividers — warm gray */
+  --bytepilot-focus-border:           #b8955c;   /* focus ring — brass */
 
-  /* Tool call status colors */
-  --bytepilot-status-pending-fg:      #cca700;
-  --bytepilot-status-pending-bg:      rgba(204, 167, 0, 0.1);
-  --bytepilot-status-pending-border:  #cca700;
-  --bytepilot-status-running-fg:      rgba(0, 122, 204, 1);
-  --bytepilot-status-running-bg:      rgba(0, 122, 204, 0.08);
-  --bytepilot-status-running-border:  rgba(0, 122, 204, 0.5);
-  --bytepilot-status-done-fg:         #4ac26b;
-  --bytepilot-status-done-bg:         rgba(0, 128, 0, 0.06);
-  --bytepilot-status-done-border:     rgba(0, 128, 0, 0.3);
-  --bytepilot-status-error-fg:        #f14c4c;
-  --bytepilot-status-error-bg:        rgba(200, 0, 0, 0.06);
-  --bytepilot-status-error-border:    rgba(200, 0, 0, 0.4);
+  /* ── Text ─────────────────────────────── */
+  --bytepilot-fg-primary:             #1a1b1e;
+  --bytepilot-fg-secondary:           #787c85;
+  --bytepilot-input-fg:               #1a1b1e;
+  --bytepilot-input-border:           #dcd8d0;
 
-  /* Image overlay */
+  /* ── Buttons ──────────────────────────── */
+  --bytepilot-btn-bg:                 #b8955c;
+  --bytepilot-btn-fg:                 #ffffff;
+  --bytepilot-btn-hover:              #a07e47;
+  --bytepilot-btn-secondary-bg:       #ede9e3;
+  --bytepilot-btn-secondary-fg:       #5c5346;
+  --bytepilot-btn-secondary-hover:    #e4dfd7;
+
+  /* ── Badges / pills ───────────────────── */
+  --bytepilot-badge-bg:               #ede9e3;
+  --bytepilot-badge-fg:               #6b6355;
+
+  /* ── Blockquote ───────────────────────── */
+  --bytepilot-blockquote-border:      #b8955c;
+  --bytepilot-blockquote-bg:          rgba(184, 149, 92, 0.06);
+
+  /* ── Links ────────────────────────────── */
+  --bytepilot-link-fg:                #b8955c;
+
+  /* ── Scrollbar ────────────────────────── */
+  --bytepilot-scrollbar:              #dcd8d0;
+  --bytepilot-scrollbar-hover:        #c4bfb5;
+
+  /* ── Titlebar ─────────────────────────── */
+  --bytepilot-titlebar-bg:            #f0ede7;
+
+  /* ── Dropdown / menu ──────────────────── */
+  --bytepilot-dropdown-bg:            #ffffff;
+  --bytepilot-dropdown-fg:            #1a1b1e;
+  --bytepilot-dropdown-border:        #e4e1db;
+
+  /* ── List items ───────────────────────── */
+  --bytepilot-list-active-bg:         #e8e2d6;
+  --bytepilot-list-active-fg:         #1a1b1e;
+  --bytepilot-list-hover-bg:          #f0ece5;
+
+  /* ── Error ────────────────────────────── */
+  --bytepilot-error-bg:               rgba(220, 80, 70, 0.1);
+  --bytepilot-error-fg:               #c24038;
+  --bytepilot-progress-bg:            #b8955c;
+  --bytepilot-accent:                 #4a9e5a;
+
+  /* ── Diff colors ──────────────────────── */
+  --bytepilot-diff-add-fg:            #2d8540;
+  --bytepilot-diff-remove-fg:         #c24038;
+  --bytepilot-diff-add-bg:            rgba(45, 133, 64, 0.12);
+  --bytepilot-diff-remove-bg:         rgba(194, 64, 56, 0.12);
+
+  /* ── Tool call status ─────────────────── */
+  --bytepilot-status-pending-fg:      #b88a2c;
+  --bytepilot-status-pending-bg:      rgba(184, 138, 44, 0.1);
+  --bytepilot-status-pending-border:  #b88a2c;
+  --bytepilot-status-running-fg:      #6b6355;
+  --bytepilot-status-running-bg:      rgba(107, 99, 85, 0.06);
+  --bytepilot-status-running-border:  rgba(107, 99, 85, 0.35);
+  --bytepilot-status-done-fg:         #2d8540;
+  --bytepilot-status-done-bg:         rgba(45, 133, 64, 0.08);
+  --bytepilot-status-done-border:     rgba(45, 133, 64, 0.3);
+  --bytepilot-status-error-fg:        #c24038;
+  --bytepilot-status-error-bg:        rgba(194, 64, 56, 0.08);
+  --bytepilot-status-error-border:    rgba(194, 64, 56, 0.4);
+
+  /* ── Image overlay ────────────────────── */
   --bytepilot-image-overlay-bg:       rgba(0, 0, 0, 0.6);
   --bytepilot-image-overlay-fg:       #ffffff;
 }

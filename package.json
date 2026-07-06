@@ -235,6 +235,7 @@
     "build:core": "turbo run build --filter=@bytepilot/core",
     "build:ext": "node esbuild.config.mjs",
     "build:webview": "cd webview-ui && npm run build",
+    "build:webview:desktop": "cd webview-ui && npm run build:desktop",
     "build:tauri": "cd packages/tauri-app && set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && npx tauri build",
     "watch": "node esbuild.config.mjs --watch",
     "dev:webview": "cd webview-ui && npm run dev",

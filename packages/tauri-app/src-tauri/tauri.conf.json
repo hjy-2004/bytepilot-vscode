@@ -5,13 +5,14 @@
   "identifier": "com.bytepilot.app",
   "build": {
     "frontendDist": "../../../webview-ui/dist",
-    "beforeDevCommand": "npm run build:webview --prefix ../../",
-    "beforeBuildCommand": "npm run build:webview --prefix ../../"
+    "beforeDevCommand": "cd ../../webview-ui && npm run build:desktop",
+    "beforeBuildCommand": "cd ../../webview-ui && npm run build:desktop"
   },
   "app": {
     "windows": [
       {
         "title": "BytePilot",
+        "url": "index.desktop.html",
         "width": 900,
         "height": 700,
         "minWidth": 400,

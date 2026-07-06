@@ -8,47 +8,61 @@ import type { ChatMessage } from '../state/chat-store';
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
+  /** 'card' = VS Code style (background+border), 'flat' = desktop style (plain text flow) */
+  variant?: 'card' | 'flat';
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isStreaming }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isStreaming, variant = 'card' }) => {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+
+  const isFlat = variant === 'flat';
 
   return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
       alignItems: isUser ? 'flex-end' : 'flex-start',
-      padding: '4px 0',
+      padding: isFlat ? '12px 0' : '4px 0',
     }}>
       <div style={{
-        maxWidth: '95%',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        background: isUser
-          ? 'var(--bytepilot-btn-bg)'
-          : isSystem
-            ? 'var(--bytepilot-error-bg)'
-            : 'var(--bytepilot-bg-secondary)',
-        color: isUser
-          ? 'var(--bytepilot-btn-fg)'
-          : isSystem
-            ? 'var(--bytepilot-error-fg)'
-            : 'var(--bytepilot-fg-primary)',
-        border: isUser ? 'none' : '1px solid var(--bytepilot-border)',
+        maxWidth: isFlat ? '100%' : '95%',
+        padding: isFlat
+          ? (isUser ? '6px 14px' : '0')
+          : '8px 12px',
+        borderRadius: isFlat ? (isUser ? '18px' : '0') : '8px',
+        background: isFlat
+          ? (isUser ? 'var(--bytepilot-btn-bg)' : 'transparent')
+          : isUser
+            ? 'var(--bytepilot-btn-bg)'
+            : isSystem
+              ? 'var(--bytepilot-error-bg)'
+              : 'var(--bytepilot-bg-secondary)',
+        color: isFlat
+          ? (isUser ? 'var(--bytepilot-btn-fg)' : 'var(--bytepilot-fg-primary)')
+          : isUser
+            ? 'var(--bytepilot-btn-fg)'
+            : isSystem
+              ? 'var(--bytepilot-error-fg)'
+              : 'var(--bytepilot-fg-primary)',
+        border: isFlat
+          ? 'none'
+          : isUser ? 'none' : '1px solid var(--bytepilot-border)',
         fontSize: '13px',
       }}>
-        {/* Role label */}
-        <div style={{
-          fontSize: '11px',
-          fontWeight: 600,
-          marginBottom: '4px',
-          opacity: 0.7,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}>
-          {isUser ? 'You' : isSystem ? 'System' : 'Assistant'}
-        </div>
+        {/* Role label — hidden in flat mode */}
+        {!isFlat && (
+          <div style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            marginBottom: '4px',
+            opacity: 0.7,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}>
+            {isUser ? 'You' : isSystem ? 'System' : 'Assistant'}
+          </div>
+        )}
 
         {/* Tool calls */}
         {message.toolCalls?.map((tc) => (
