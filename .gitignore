@@ -20,6 +20,10 @@ webview-ui/dist/
 .vscode-test/
 .claude/
 
+# Claude Code session artifacts
+.cc-*.log
+.cc-*.md
+
 # Sensitive
 .env
 *.env
