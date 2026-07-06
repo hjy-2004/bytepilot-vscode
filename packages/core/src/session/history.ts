@@ -184,8 +184,8 @@ export function saveMessage(
     fs.appendFileSync(filePath, JSON.stringify(entry) + '\n', { encoding: 'utf-8', mode: 0o600 });
     logInfo(`Saved ${role} message to session ${sessionId}: "${content.substring(0, 40)}..."`);
 
-    // Occasional prune
-    if (Math.random() < 0.03) pruneSessionFile(filePath);
+    // Deterministic prune: check after every write if we're over the limit
+    pruneSessionFile(filePath);
   } catch (err) {
     logError('Failed to save message', err);
   }

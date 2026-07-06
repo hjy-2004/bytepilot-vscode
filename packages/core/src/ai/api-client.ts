@@ -1,4 +1,5 @@
 import type { Message, ToolCall } from './message-types';
+import { logWarn } from '../platform/logger';
 
 // ── Retry helpers ──
 
@@ -11,16 +12,24 @@ async function fetchWithRetry(
   init: RequestInit,
   retries = MAX_RETRIES,
 ): Promise<Response> {
+  let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(url, init);
-    if (res.ok || !RETRYABLE_STATUSES.has(res.status) || attempt === retries) {
-      return res;
+    try {
+      const res = await fetch(url, init);
+      if (res.ok || !RETRYABLE_STATUSES.has(res.status) || attempt === retries) {
+        return res;
+      }
+      lastError = new Error(`HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+    } catch (err: any) {
+      lastError = err;
+      if (err.name === 'AbortError') throw err;
     }
-    const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 500;
-    await new Promise(r => setTimeout(r, delay));
+    if (attempt < retries) {
+      const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 500;
+      await new Promise(r => setTimeout(r, delay));
+    }
   }
-  // Should not reach here, but just in case
-  return fetch(url, init);
+  throw lastError || new Error('Request failed after all retries');
 }
 
 export interface ApiConfig {
@@ -30,6 +39,8 @@ export interface ApiConfig {
   maxTokens?: number;
   thinkingBudget?: number; // budget_tokens for Anthropic extended thinking (0 = disabled)
   provider?: string; // 'anthropic' | 'openai' | 'ollama'
+  /** Explicitly force a specific API protocol. Auto-detected if omitted. */
+  apiFormat?: 'anthropic' | 'openai_chat' | 'google' | 'openai_compat';
 }
 
 export interface StreamResult {
@@ -57,7 +68,7 @@ export async function streamChat(
   const provider = config.provider || 'anthropic';
 
   // If config has an explicit apiFormat field, route by format
-  const apiFormat = (config as any).apiFormat as string | undefined;
+  const apiFormat = config.apiFormat;
   if (apiFormat === 'google') {
     return streamChatGeminiNative(config, messages, tools, onToken, signal);
   }
@@ -240,7 +251,7 @@ async function streamChatAnthropic(
               stopReason = j.delta.stop_reason;
             }
           }
-        } catch { /* skip malformed SSE lines */ }
+        } catch { /* Anthropic SSE: skip malformed lines */ }
       }
     }
   } finally { reader.releaseLock(); }
@@ -387,7 +398,7 @@ async function streamChatOpenAI(
           if (choice.finish_reason) {
             stopReason = choice.finish_reason;
           }
-        } catch { /* skip malformed SSE lines */ }
+        } catch { /* OpenAI SSE: skip malformed lines */ }
       }
     }
   } finally { reader.releaseLock(); }
@@ -506,7 +517,7 @@ async function streamChatOllama(
             };
             stopReason = j.done_reason || 'stop';
           }
-        } catch { /* skip malformed SSE lines */ }
+        } catch { /* Ollama SSE: skip malformed lines */ }
       }
     }
   } finally { reader.releaseLock(); }
@@ -651,7 +662,7 @@ async function streamChatGeminiNative(
               outputTokens: j.usageMetadata.candidatesTokenCount || 0,
             };
           }
-        } catch { /* skip malformed SSE lines */ }
+        } catch { /* Gemini SSE: skip malformed lines */ }
       }
     }
   } finally {

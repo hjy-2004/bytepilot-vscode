@@ -1,6 +1,6 @@
 use std::process::Command;
 use std::time::Duration;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 
 use serde::Serialize;
 
@@ -24,7 +24,7 @@ pub fn cmd_execute_command(
         ("sh", "-c")
     };
 
-    let child = Command::new(shell)
+    let mut child = Command::new(shell)
         .arg(flag)
         .arg(&command)
         .current_dir(&cwd)
@@ -35,11 +35,23 @@ pub fn cmd_execute_command(
 
     let timeout = Duration::from_millis(timeout_ms);
 
-    // Use a separate thread to wait for the process with a timeout
+    // Save the PID so we can kill the process on timeout even after the thread
+    // takes ownership of the Child handle via take().
+    let pid = child.id();
+
+    // Keep the child handle in Option so the spawned thread can take() ownership
+    // and release the mutex before blocking on wait_with_output().
+    let child_handle = Arc::new(Mutex::new(Some(child)));
+    let child_for_thread = Arc::clone(&child_handle);
+
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let result = child.wait_with_output();
-        let _ = tx.send(result);
+        // Take ownership of the child from the mutex, then release the lock
+        let owned_child = child_for_thread.lock().unwrap().take();
+        if let Some(mut c) = owned_child {
+            let result = c.wait_with_output();
+            let _ = tx.send(result);
+        }
     });
 
     match rx.recv_timeout(timeout) {
@@ -55,18 +67,40 @@ pub fn cmd_execute_command(
             Err(format!("Failed to wait on process: {}", e))
         }
         Err(mpsc::RecvTimeoutError::Timeout) => {
-            // Timed out — kill the child process
-            // Note: we lost the handle when moving it to the thread,
-            // so we can't kill it here. In production, keep the handle.
+            // Timed out — kill by PID since the Child handle was taken by the thread
+            kill_by_pid(pid);
             Ok(CommandResult {
                 stdout: String::new(),
-                stderr: format!("Command timed out after {}ms", timeout_ms),
+                stderr: format!("Command timed out after {}ms and was killed", timeout_ms),
                 exit_code: -1,
                 killed: true,
             })
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => {
-            Err("Process terminated unexpectedly".into())
+            // Thread panicked — try to clean up
+            kill_by_pid(pid);
+            Err("Command process terminated unexpectedly".into())
         }
+    }
+}
+
+/// Kill a process by its PID. Cross-platform: uses taskkill on Windows, SIGKILL on Unix.
+fn kill_by_pid(pid: Option<u32>) {
+    let Some(pid) = pid else { return };
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
     }
 }

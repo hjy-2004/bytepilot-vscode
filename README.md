@@ -27,12 +27,14 @@
 - **Slash Commands `/`** — 输入 `/` 弹出命令菜单
 - **Input History** — `↑`/`↓` 键浏览历史消息（最多 50 条）
 - **Image Paste & Upload** — 粘贴图片或点击按钮本地上传
-- **Semantic Search** — BM25 代码搜索引擎
+- **Semantic Search** — BM25 关键词搜索（非语义/Embedding 搜索）
+- **CJK Token Counting** — 中/日/韩文字符感知的 token 估算（~1.5 chars/token vs ASCII ~4）
 - **Project Rules** — `.bytepilotrules` 自动注入 AI system prompt
-- **Auto Config** — 首次启动自动读取 `.claude/settings.json`
+- **Auto Config** — 首次启动自动读取 `.claude/settings.json`（会弹窗提示）
 - **Multi-Session** — JSONL 持久化，创建/切换/删除会话
 - **Structured Logging** — 统一日志（桌面端支持文件日志 `%APPDATA%/BytePilot/logs/`）
 - **Cross-Platform** — 70%+ 代码在 VS Code 和桌面端之间共享
+- **Security** — 工作区路径边界检查、命令注入防护、Shell 超时杀进程
 
 ## 快速开始
 
@@ -146,6 +148,17 @@ extension_plugin/
 | `aiCodingAgent.maxAgentSteps` | `500` | Agent 循环安全上限 |
 | `aiCodingAgent.toolApprovalLevel` | `writeOnly` | 审批级别 |
 | `aiCodingAgent.completionsEnabled` | `true` | 启用补全 |
+| `aiCodingAgent.contextLength` | `128000` | 上下文长度（tokens） |
+
+## 测试
+
+```bash
+cd packages/core
+npm run build        # 编译 @bytepilot/core
+npx ts-node src/__tests__/token-counter.test.ts   # Token 计数测试
+npx ts-node src/__tests__/api-client.test.ts      # API 消息转换测试
+npx ts-node src/__tests__/validator.test.ts       # 配置验证测试
+```
 
 ## License
 

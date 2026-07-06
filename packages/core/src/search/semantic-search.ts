@@ -2,8 +2,21 @@ import * as path from 'path';
 import { logInfo } from '../platform/logger';
 
 /**
- * BM25-based semantic search over workspace code files.
- * Provides relevance-ranked search without external dependencies.
+ * BM25-based keyword search over workspace code files (NOT semantic/embedding search).
+ *
+ * This is a lightweight, zero-dependency search engine that uses the BM25
+ * probabilistic ranking algorithm. It matches exact tokens and their frequency
+ * distribution — it does NOT understand synonyms, concepts, or natural language
+ * paraphrasing. For true semantic search, an embedding-based approach (e.g.,
+ * using vector databases) would be needed.
+ *
+ * Why BM25 and not semantic:
+ * - No external model/API dependency
+ * - Fast to build and query
+ * - Works well for code (identifiers, function names are exact-match friendly)
+ * - Good enough for "find files related to X" in small-to-medium projects
+ *
+ * The name "SemanticSearch" is kept for backward compatibility but is a misnomer.
  */
 
 const SOURCE_EXTENSIONS = new Set([

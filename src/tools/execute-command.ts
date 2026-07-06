@@ -5,10 +5,12 @@ import type { ToolDef } from '../types/tools';
 
 // Block destructive file operations, force push to protected branches, and obfuscated payloads.
 // This is a defense-in-depth measure on top of the tool approval flow.
+// IMPORTANT: This is a best-effort blocklist — it does NOT replace the approval gate.
+// Users must still manually review command output for safety.
 const DANGEROUS = [
   // Recursive deletion from root
   /\brm\s+.*-r.*\s+\//, /\brm\s+.*-r.*\s+\/etc\b/, /\brm\s+.*-r.*\s+\/home\b/,
-  /\brmdir\s+\//, /\bdel\s+\/[a-z]/, /\bdeltree\s+\//,
+  /\brmdir\s+\//, /\bdel\s+\/[a-z]/i, /\bdeltree\s+\//i,
   // Force push to main/master/protected branches
   /\bgit\s+push\s+.*--force.*\s+(main|master|release|prod)/,
   /\bgit\s+push\s+.*-f\s+(main|master|release|prod)/,
@@ -20,6 +22,16 @@ const DANGEROUS = [
   /\bchmod\s+.*777\s+\//, /\bchmod\s+.*-R\s+777\s+\//,
   // Disk formatting / destructive system commands
   /\bmkfs\./, /\bdd\s+if=.*of=\/dev\//, /\b>\/dev\/sd/,
+  // Argument injection: -- followed by shell meta-characters
+  /\s--\s*[;|&`$]/,
+  // Reboot / shutdown
+  /\b(shutdown|reboot|halt|poweroff)\b/,
+  // Format entire disks on Windows
+  /\bformat\s+[a-zA-Z]:\s*\/[qQ]/,
+  // Git reset hard on branches
+  /\bgit\s+reset\s+--hard\b/,
+  // Delete important directories recursively via find
+  /\bfind\s+\/.*-exec\s+rm\b/,
 ];
 
 export const executeCommandTool: ToolDef = {

@@ -4,6 +4,32 @@ All notable changes to BytePilot will be documented in this file.
 
 ---
 
+## [0.6.0] - 2026-07-06
+
+### Added
+- **Unit tests**: 34 test cases across 3 test suites (token-counter, api-client, validator) in `packages/core/src/__tests__/`.
+- **CJK-aware token counting**: Character-based token estimator now distinguishes CJK characters (~1.5 chars/token) from ASCII (~4 chars/token) using Unicode range detection, providing significantly more accurate estimates for Chinese/Japanese/Korean text.
+- **Workspace boundary checks (Rust fs.rs)**: All file system commands (`cmd_read_file`, `cmd_write_file`, `cmd_create_dir`, `cmd_read_dir`, `cmd_stat`, `cmd_exists`, `cmd_find_files`) now validate paths are within the workspace root using `Path::canonicalize()`, blocking `..` traversal and symlink escape attacks.
+- **Shell timeout process kill (Rust shell.rs)**: `cmd_execute_command` now properly kills timed-out child processes by PID (`taskkill /F` on Windows, `kill -9` on Unix), fixing the previous "lost handle" bug where zombie processes lived indefinitely.
+- **Tauri config cache**: `TauriConfigStore.get()` now returns real values from an in-memory cache (loaded from Rust backend at init) instead of always returning defaults.
+- **Tauri `isWithinWorkspace` validation**: `TauriFileSystem.isWithinWorkspace()` now delegates to the Rust backend's `cmd_is_within_workspace` instead of unconditionally returning `true`.
+- **Sidecar ChatEngine integration**: The Tauri sidecar now initializes `ToolRegistry` with execution context and wires `runAgentLoop` with actual AI provider config for JSON-RPC streaming, replacing the previous stub/echo implementation.
+- **API key import transparency**: When credentials are auto-imported from `~/.claude/settings.json`, users now see an info notification explaining the source.
+
+### Fixed
+- **`fetchWithRetry` error handling**: Removed unreachable fallback `return fetch(url, init)` after retry loop; now properly throws an error when all retries are exhausted.
+- **History pruning**: Changed from probabilistic (`Math.random() < 0.03`) to deterministic (prune after every write when over limit), ensuring reliable session file size management.
+- **SSE parse error labels**: Silent catch blocks in `api-client.ts` now labeled by parser (Anthropic/OpenAI/Ollama/Gemini) for easier debugging.
+- **Command injection protection**: Added 6 dangerous patterns to `execute_command.ts`: argument injection via `--`, reboot/shutdown, Windows format, `git reset --hard`, `find -exec rm`.
+
+### Changed
+- **`ApiConfig` type**: Added optional `apiFormat` field (`'anthropic' | 'openai_chat' | 'google' | 'openai_compat'`), replacing `(config as any).apiFormat` cast.
+- **`chat-engine.ts` type safety**: Zod schema extraction now uses typed `ZodFieldDef` / `ZodSchemaDef` interfaces instead of `any` casts; model ID extraction uses typed destructuring.
+- **`semantic-search.ts` documentation**: Added JSDoc clarifying that the class implements BM25 keyword search, not semantic/embedding search.
+- **README / README_EN**: Updated with CJK token counting, security features, settings table, and test instructions.
+
+---
+
 ## [0.5.0] - 2026-06-29
 
 ### Added

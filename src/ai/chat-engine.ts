@@ -134,25 +134,39 @@ export class ChatEngine {
     const estimatedSysTokens = estimateTokens(systemPrompt, false);
     logInfo(`[ChatEngine] System prompt: ~${estimatedSysTokens} tokens`);
 
+    // Zod internal shape extraction types
+    interface ZodFieldDef {
+      _def: { typeName: string; description?: string };
+    }
+    interface ZodSchemaDef {
+      _def: { shape?: () => Record<string, ZodFieldDef> };
+    }
+
     const tools = this.toolRegistry.list();
+    const tmap: Record<string, string> = { ZodString: 'string', ZodNumber: 'number', ZodBoolean: 'boolean' };
     const toolDefs: ToolDef[] = tools.map((t) => {
       const p: Record<string, unknown> = { type: 'object', properties: {}, required: [] };
       try {
-        const shape = (t.inputSchema as any)?._def?.shape?.() || {};
+        const schema = t.inputSchema as unknown as ZodSchemaDef;
+        const shape = schema._def?.shape?.() || {};
         for (const [k, s] of Object.entries(shape)) {
-          const tn = (s as any)?._def?.typeName || 'ZodString';
-          const tmap: Record<string, string> = { ZodString: 'string', ZodNumber: 'number', ZodBoolean: 'boolean' };
-          (p.properties as any)[k] = { type: tmap[tn as string] || 'string', description: (s as any)?._def?.description || '' };
+          const tn = s?._def?.typeName || 'ZodString';
+          (p.properties as Record<string, unknown>)[k] = {
+            type: tmap[tn] || 'string',
+            description: s?._def?.description || '',
+          };
           if (tn !== 'ZodOptional') (p.required as string[]).push(k);
         }
       } catch { /* skip non-Zod or malformed schemas */ }
       return { name: t.name, description: t.description, parameters: p };
     });
 
+    // Extract model ID from the AI SDK LanguageModelV1 instance
+    const modelId: string = (this.chatModel as { modelId?: string }).modelId || 'unknown';
     const cfg: ApiConfig = {
       apiKey: this.apiKey,
       baseURL: this.baseURL,
-      model: ((this.chatModel as any).modelId || 'unknown').replace(/\[.*\]$/, ''), // strip thinking budget suffix
+      model: modelId.replace(/\[.*\]$/, ''), // strip thinking budget suffix
       maxTokens: this.config.get<number>('maxTokens', 4096),
       thinkingBudget: this.config.get<number>('thinkingBudget', 4096),
       provider: this.provider,

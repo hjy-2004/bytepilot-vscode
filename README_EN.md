@@ -23,9 +23,11 @@ Cursor-like AI coding assistant supporting both **VS Code extension** and **Taur
 - **Multi-Provider** — 60+ provider presets: Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama, plus Kimi / Zhipu / MiniMax / StepFun / Volcano / OpenRouter / SiliconFlow and more
 - **Model Fetching** — Click 🔄 to fetch live model lists from provider APIs
 - **Per-Provider API Key** — Store API keys independently per provider
-- **Semantic Search** — BM25 code search engine
+- **Keyword Search** — BM25-based code search engine (not semantic/embedding search)
+- **CJK Token Counting** — CJK-aware token estimation (~1.5 chars/token for Chinese/Japanese/Korean, ~4 for ASCII)
 - **Structured Logging** — File-based logging on desktop (`%APPDATA%/BytePilot/logs/`)
 - **Cross-Platform** — 70%+ code shared between VS Code plugin and Tauri desktop app
+- **Security** — Workspace boundary checks, command injection protection, shell timeout process kill
 
 ## Quick Start
 
@@ -78,7 +80,7 @@ extension_plugin/
 │   │   ├── ai/                    # agent-loop, api-client, stream-bridge, ...
 │   │   ├── tools/                 # registry, diff-file, definitions
 │   │   ├── session/               # JSONL persistence
-│   │   ├── search/                # BM25 semantic search
+│   │   ├── search/                # BM25 keyword search
 │   │   ├── config/                # 60+ provider presets
 │   │   ├── types/                 # IPC, AI, providers, platform interfaces
 │   │   └── platform/              # ILogger, IFileSystem, IConfigStore, ...
@@ -136,6 +138,18 @@ Press **F12** in the Tauri window to open DevTools → Console for real-time log
 | `aiCodingAgent.thinkingBudget` | `4096` | Extended thinking budget |
 | `aiCodingAgent.maxAgentSteps` | `500` | Agent loop safety cap |
 | `aiCodingAgent.toolApprovalLevel` | `writeOnly` | Tool approval level |
+| `aiCodingAgent.completionsEnabled` | `true` | Enable inline completions |
+| `aiCodingAgent.contextLength` | `128000` | Context window size (tokens) |
+
+## Testing
+
+```bash
+cd packages/core
+npm run build        # compile @bytepilot/core
+npx ts-node src/__tests__/token-counter.test.ts   # Token counting tests
+npx ts-node src/__tests__/api-client.test.ts      # API message conversion tests
+npx ts-node src/__tests__/validator.test.ts       # Config validation tests
+```
 
 ## Supported Providers
 

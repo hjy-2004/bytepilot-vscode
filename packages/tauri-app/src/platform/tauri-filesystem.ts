@@ -55,8 +55,11 @@ export class TauriFileSystem implements IFileSystem {
     return relativePath;
   }
 
-  isWithinWorkspace(absolutePath: string): boolean {
-    // Delegated to the Rust backend
-    return true; // Validation happens in the Rust layer
+  async isWithinWorkspace(absolutePath: string): Promise<boolean> {
+    try {
+      return await this.invoke('cmd_is_within_workspace', { absolute: absolutePath });
+    } catch {
+      return false;
+    }
   }
 }

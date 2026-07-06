@@ -9,32 +9,55 @@ fn get_workspace_root(_app: &AppHandle) -> PathBuf {
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
+/// Verify that an absolute path is within the workspace root.
+/// Returns Ok(canonicalized absolute path) or Err with a message.
+fn check_within_workspace(app: &AppHandle, path: &str, label: &str) -> Result<PathBuf, String> {
+    let root = get_workspace_root(app);
+    let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
+    let target = Path::new(path);
+    // Resolve the target path (including canonicalization to catch .. traversal)
+    let target_canon = target.canonicalize().map_err(|e| {
+        format!("Cannot access {}: {}", label, e)
+    })?;
+    if !target_canon.starts_with(&root_canon) {
+        return Err(format!(
+            "Access denied: {} is outside workspace",
+            label
+        ));
+    }
+    Ok(target_canon)
+}
+
 #[tauri::command]
 pub fn cmd_get_workspace_root(app: tauri::AppHandle) -> Result<String, String> {
     Ok(get_workspace_root(&app).to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub fn cmd_read_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| format!("{}", e))
+pub fn cmd_read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let safe = check_within_workspace(&app, &path, "read_file")?;
+    std::fs::read_to_string(&safe).map_err(|e| format!("{}", e))
 }
 
 #[tauri::command]
-pub fn cmd_write_file(path: String, content: String) -> Result<(), String> {
-    if let Some(parent) = Path::new(&path).parent() {
+pub fn cmd_write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
+    let safe = check_within_workspace(&app, &path, "write_file")?;
+    if let Some(parent) = safe.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("{}", e))?;
     }
-    std::fs::write(&path, content).map_err(|e| format!("{}", e))
+    std::fs::write(&safe, content).map_err(|e| format!("{}", e))
 }
 
 #[tauri::command]
-pub fn cmd_create_dir(path: String) -> Result<(), String> {
-    std::fs::create_dir_all(&path).map_err(|e| format!("{}", e))
+pub fn cmd_create_dir(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let safe = check_within_workspace(&app, &path, "create_dir")?;
+    std::fs::create_dir_all(&safe).map_err(|e| format!("{}", e))
 }
 
 #[tauri::command]
-pub fn cmd_read_dir(path: String) -> Result<Vec<(String, bool)>, String> {
-    let entries = std::fs::read_dir(&path).map_err(|e| format!("{}", e))?;
+pub fn cmd_read_dir(app: tauri::AppHandle, path: String) -> Result<Vec<(String, bool)>, String> {
+    let safe = check_within_workspace(&app, &path, "read_dir")?;
+    let entries = std::fs::read_dir(&safe).map_err(|e| format!("{}", e))?;
     let mut result = Vec::new();
     for entry in entries {
         if let Ok(entry) = entry {
@@ -54,8 +77,9 @@ pub struct FileStat {
 }
 
 #[tauri::command]
-pub fn cmd_stat(path: String) -> Result<FileStat, String> {
-    let meta = std::fs::metadata(&path).map_err(|e| format!("{}", e))?;
+pub fn cmd_stat(app: tauri::AppHandle, path: String) -> Result<FileStat, String> {
+    let safe = check_within_workspace(&app, &path, "stat")?;
+    let meta = std::fs::metadata(&safe).map_err(|e| format!("{}", e))?;
     Ok(FileStat {
         size: meta.len(),
         is_directory: meta.is_dir(),
@@ -64,12 +88,14 @@ pub fn cmd_stat(path: String) -> Result<FileStat, String> {
 }
 
 #[tauri::command]
-pub fn cmd_exists(path: String) -> bool {
-    Path::new(&path).exists()
+pub fn cmd_exists(app: tauri::AppHandle, path: String) -> Result<bool, String> {
+    let safe = check_within_workspace(&app, &path, "exists")?;
+    Ok(safe.exists())
 }
 
 #[tauri::command]
 pub fn cmd_find_files(
+    app: tauri::AppHandle,
     base_path: String,
     include: String,
     exclude: String,
@@ -82,8 +108,12 @@ pub fn cmd_find_files(
         .map(|s| s.trim().to_string())
         .collect();
 
-    // Simple glob-aware walking: strip **/ prefix, walk recursively
-    let base = Path::new(&base_path);
+    // Validate base_path is within workspace, or use workspace root if empty
+    let base = if base_path.is_empty() {
+        get_workspace_root(&app)
+    } else {
+        check_within_workspace(&app, &base_path, "find_files base_path")?
+    };
     let pattern = include.trim_start_matches("**/").to_string();
 
     fn walk(
@@ -124,7 +154,7 @@ pub fn cmd_find_files(
         }
     }
 
-    walk(base, base, &pattern, &exclude_patterns, max_results, &mut results);
+    walk(&base, &base, &pattern, &exclude_patterns, max_results, &mut results);
     Ok(results)
 }
 
@@ -136,7 +166,5 @@ pub fn cmd_resolve_path(app: tauri::AppHandle, relative: String) -> String {
 
 #[tauri::command]
 pub fn cmd_is_within_workspace(app: tauri::AppHandle, absolute: String) -> bool {
-    let root = get_workspace_root(&app);
-    let abs_path = Path::new(&absolute);
-    abs_path.starts_with(&root)
+    check_within_workspace(&app, &absolute, "path").is_ok()
 }

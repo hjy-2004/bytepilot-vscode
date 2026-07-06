@@ -137,6 +137,13 @@ export class ProviderManager implements vscode.Disposable {
         if (vscConfig.inspect('provider')?.globalValue === undefined) {
           vscConfig.update('provider', 'anthropic', vscode.ConfigurationTarget.Global);
         }
+        // Notify user that credentials were imported from Claude Code config
+        const sourcePath = path.join(os.homedir(), '.claude', 'settings.json');
+        logInfo(`Imported API credentials from Claude Code config: ${sourcePath}`);
+        vscode.window.showInformationMessage(
+          `BytePilot: Imported AI credentials from Claude Code configuration (${sourcePath}). ` +
+          `To use a different provider, run "Configure AI Provider".`
+        );
       }
 
       return key || undefined;
