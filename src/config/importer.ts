@@ -18,6 +18,9 @@ interface ImportedConfig {
   baseURL?: string;
   source: string;
   sourcePath: string;
+  /** Arbitrary shell command from the source config that can resolve an API key.
+   * Never executed without explicit user consent (see runApiKeyHelperWithConsent). */
+  apiKeyHelper?: string;
 }
 
 /** Cache of scanned configs with full details (including API keys) */
@@ -92,6 +95,7 @@ function parseClaudeConfig(content: string, filePath: string): ImportedConfig | 
     let model: string | undefined;
     let apiKey: string | undefined;
     let baseURL: string | undefined;
+    let apiKeyHelper: string | undefined;
 
     if (isSettingsFormat) {
       // Modern Claude Code format (env-based)
@@ -111,18 +115,13 @@ function parseClaudeConfig(content: string, filePath: string): ImportedConfig | 
       // Legacy format
       model = data.model || data.defaultModel;
       baseURL = data.baseURL;
-      // Try apiKeyHelper for legacy format
-      const apiKeyHelper = data.apiKeyHelper;
-      if (apiKeyHelper && typeof apiKeyHelper === 'string') {
-        try {
-          const result = execSync(apiKeyHelper, {
-            encoding: 'utf-8', timeout: 5000,
-          }).trim();
-          if (result && !result.startsWith('Error')) apiKey = result;
-        } catch { /* skip */ }
-      }
-      // Also check direct key fields
+      // Check direct key fields. Note: apiKeyHelper (an arbitrary shell command
+      // read from a file on disk) is NOT executed here — it is captured below
+      // and only run after explicit user consent.
       apiKey = apiKey || data.apiKey || data.anthropicApiKey || data.openaiApiKey;
+      if (!apiKey && typeof data.apiKeyHelper === 'string' && data.apiKeyHelper.trim()) {
+        apiKeyHelper = data.apiKeyHelper.trim();
+      }
     }
 
     // Infer provider from the environment variables and base URL
@@ -144,6 +143,7 @@ function parseClaudeConfig(content: string, filePath: string): ImportedConfig | 
       baseURL: baseURL || undefined,
       source: 'Claude Code',
       sourcePath: filePath,
+      apiKeyHelper,
     };
   } catch {
     return null;
@@ -359,16 +359,49 @@ export async function importCachedConfig(
 /**
  * Apply imported config to VS Code settings.
  */
+/**
+ * Execute an apiKeyHelper command, but ONLY after explicit user consent.
+ * apiKeyHelper is arbitrary shell read from a config file on disk, so running it
+ * without confirmation is a code-execution risk. Returns the resolved key or
+ * undefined if the user declines or execution fails.
+ */
+async function runApiKeyHelperWithConsent(command: string, source: string): Promise<string | undefined> {
+  const choice = await vscode.window.showWarningMessage(
+    `The "${source}" config asks to run a shell command to obtain the API key:\n\n${command}\n\nOnly allow this if you trust the source. Run it?`,
+    { modal: true },
+    'Run Command',
+    'Skip'
+  );
+  if (choice !== 'Run Command') {
+    logInfo('User declined to run apiKeyHelper command');
+    return undefined;
+  }
+  try {
+    const result = execSync(command, { encoding: 'utf-8', timeout: 5000 }).trim();
+    if (result && !result.startsWith('Error')) return result;
+  } catch (err) {
+    logError('apiKeyHelper execution failed', err);
+  }
+  return undefined;
+}
+
 export async function applyImportedConfig(
   imported: ImportedConfig,
   secretsStore: { setApiKey: (provider: ProviderId, key: string) => Promise<void> }
 ): Promise<void> {
   const config = vscode.workspace.getConfiguration('aiCodingAgent');
 
+  // If no direct key was found but an apiKeyHelper command is present, ask the
+  // user for consent before executing it.
+  let apiKey = imported.apiKey;
+  if (!apiKey && imported.apiKeyHelper) {
+    apiKey = await runApiKeyHelperWithConsent(imported.apiKeyHelper, imported.source);
+  }
+
   // Store API key FIRST — config.update() triggers onDidChangeConfiguration
   // which calls ProviderManager.reload() which validates the API key exists
-  if (imported.apiKey) {
-    await secretsStore.setApiKey(imported.provider, imported.apiKey);
+  if (apiKey) {
+    await secretsStore.setApiKey(imported.provider, apiKey);
   }
 
   await config.update('provider', imported.provider, vscode.ConfigurationTarget.Global);

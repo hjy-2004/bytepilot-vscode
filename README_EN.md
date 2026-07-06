@@ -22,12 +22,12 @@ Cursor-like AI coding assistant supporting both **VS Code extension** and **Taur
 - **Tool System** — 8 built-in tools: read / write / edit / search / list / command / diagnostics / diff
 - **Multi-Provider** — 60+ provider presets: Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama, plus Kimi / Zhipu / MiniMax / StepFun / Volcano / OpenRouter / SiliconFlow and more
 - **Model Fetching** — Click 🔄 to fetch live model lists from provider APIs
-- **Per-Provider API Key** — Store API keys independently per provider
+- **Per-Provider API Key** — Store API keys independently per provider (VS Code uses the system SecretStorage, desktop uses the OS keychain — never written to disk in plaintext)
 - **Keyword Search** — BM25-based code search engine (not semantic/embedding search)
 - **CJK Token Counting** — CJK-aware token estimation (~1.5 chars/token for Chinese/Japanese/Korean, ~4 for ASCII)
 - **Structured Logging** — File-based logging on desktop (`%APPDATA%/BytePilot/logs/`)
 - **Cross-Platform** — 70%+ code shared between VS Code plugin and Tauri desktop app
-- **Security** — Workspace boundary checks, command injection protection, shell timeout process kill
+- **Security** — Workspace boundary checks (canonicalized to block `..` traversal, unified across both platforms), dangerous-command interception on both platforms, shell timeout process kill, and consent-gated execution of `apiKeyHelper` during config import
 
 ## Quick Start
 
@@ -144,11 +144,12 @@ Press **F12** in the Tauri window to open DevTools → Console for real-time log
 ## Testing
 
 ```bash
-cd packages/core
-npm run build        # compile @bytepilot/core
-npx ts-node src/__tests__/token-counter.test.ts   # Token counting tests
-npx ts-node src/__tests__/api-client.test.ts      # API message conversion tests
-npx ts-node src/__tests__/validator.test.ts       # Config validation tests
+# Run all core tests in one command (compiles, then runs token counting /
+# API message conversion / config validation tests)
+npm test -w @bytepilot/core
+
+# Or via Turborepo (same command CI uses)
+npx turbo run test
 ```
 
 ## Supported Providers

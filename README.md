@@ -23,7 +23,7 @@
 - **Multi-Provider** — 60+ 供应商预设，支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama / Kimi / 智谱 / MiniMax / 阶跃星辰 / 火山方舟 / OpenRouter / SiliconFlow 等
 - **Provider Categories** — 供应商按 5 大分类展示（官方 / 国产官方 / 聚合商 / 第三方 / 云服务商）
 - **Model Fetching** — 点击 🔄 一键从供应商 API 拉取实时模型列表
-- **Per-Provider API Key** — 每个供应商独立存储 API key
+- **Per-Provider API Key** — 每个供应商独立存储 API key（VS Code 用系统 SecretStorage，桌面端用 OS 系统凭据库 keychain，绝不明文落盘）
 - **Slash Commands `/`** — 输入 `/` 弹出命令菜单
 - **Input History** — `↑`/`↓` 键浏览历史消息（最多 50 条）
 - **Image Paste & Upload** — 粘贴图片或点击按钮本地上传
@@ -34,7 +34,7 @@
 - **Multi-Session** — JSONL 持久化，创建/切换/删除会话
 - **Structured Logging** — 统一日志（桌面端支持文件日志 `%APPDATA%/BytePilot/logs/`）
 - **Cross-Platform** — 70%+ 代码在 VS Code 和桌面端之间共享
-- **Security** — 工作区路径边界检查、命令注入防护、Shell 超时杀进程
+- **Security** — 工作区路径边界检查（canonicalize 防 `..` 穿越，双平台统一）、双平台危险命令拦截、Shell 超时杀进程、配置导入的 apiKeyHelper 需显式确认后才执行
 
 ## 快速开始
 
@@ -153,11 +153,11 @@ extension_plugin/
 ## 测试
 
 ```bash
-cd packages/core
-npm run build        # 编译 @bytepilot/core
-npx ts-node src/__tests__/token-counter.test.ts   # Token 计数测试
-npx ts-node src/__tests__/api-client.test.ts      # API 消息转换测试
-npx ts-node src/__tests__/validator.test.ts       # 配置验证测试
+# 一键运行 core 全部测试（编译后运行 token 计数 / API 消息转换 / 配置验证）
+npm test -w @bytepilot/core
+
+# 或通过 Turborepo 运行（CI 使用同一命令）
+npx turbo run test
 ```
 
 ## License

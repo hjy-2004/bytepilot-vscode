@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{chat::*, config::*, fs::*, log::*, shell::*, workspace::*};
+use commands::{chat::*, config::*, fs::*, log::*, secrets::*, shell::*, workspace::*};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +23,10 @@ pub fn run() {
             // Config
             cmd_get_config,
             cmd_set_config,
+            // Secrets (OS keychain)
+            cmd_secret_get,
+            cmd_secret_set,
+            cmd_secret_delete,
             // Shell
             cmd_execute_command,
             // Logging

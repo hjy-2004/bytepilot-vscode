@@ -31,10 +31,22 @@ jobs:
       - run: npm ci
       - run: npx turbo run lint
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx turbo run test
+
   build:
     name: Build & Package (VS Code)
     runs-on: ubuntu-latest
-    needs: [typecheck, lint]
+    needs: [typecheck, lint, test]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,7 +71,7 @@ jobs:
   build-desktop:
     name: Build Desktop (Tauri)
     runs-on: ${{ matrix.os }}
-    needs: [typecheck, lint]
+    needs: [typecheck, lint, test]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     strategy:
       matrix:

@@ -23,3 +23,7 @@ webview-ui/dist/
 # Sensitive
 .env
 *.env
+
+# Local chat sessions / app state (never commit conversation history)
+.bytepilot/
+**/.bytepilot/

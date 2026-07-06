@@ -10,7 +10,8 @@
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint: ok'"
+    "lint": "echo 'lint: ok'",
+    "test": "tsc && node dist/__tests__/token-counter.test.js && node dist/__tests__/api-client.test.js && node dist/__tests__/validator.test.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",

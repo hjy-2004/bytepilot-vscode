@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::State;
 use serde::Serialize;
@@ -15,6 +15,61 @@ impl WorkspaceState {
             root: Mutex::new(std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
         }
     }
+
+    /// Snapshot the current workspace root.
+    pub fn root_path(&self) -> PathBuf {
+        self.root
+            .lock()
+            .map(|r| r.clone())
+            .unwrap_or_else(|e| e.into_inner().clone())
+    }
+}
+
+/// Resolve `candidate` (relative or absolute) against `root` and verify it stays
+/// inside `root`, defeating `..` traversal and symlink escapes.
+///
+/// Canonicalizes the root and the deepest existing ancestor of the target, then
+/// re-appends the not-yet-created trailing components. Returns the safe absolute
+/// path or an error when the target escapes the workspace.
+pub fn resolve_within(root: &Path, candidate: &str) -> Result<PathBuf, String> {
+    let root_canon = root
+        .canonicalize()
+        .unwrap_or_else(|_| root.to_path_buf());
+
+    let raw = {
+        let c = Path::new(candidate);
+        if c.is_absolute() { c.to_path_buf() } else { root_canon.join(c) }
+    };
+
+    // Walk up to the first ancestor that exists so we can canonicalize it
+    // (canonicalize requires the path to exist). Collect the trailing,
+    // not-yet-created components to re-append afterwards.
+    let mut existing = raw.as_path();
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    let resolved_existing = loop {
+        match existing.canonicalize() {
+            Ok(p) => break p,
+            Err(_) => match existing.parent() {
+                Some(parent) => {
+                    if let Some(name) = existing.file_name() {
+                        tail.push(name.to_os_string());
+                    }
+                    existing = parent;
+                }
+                None => return Err("Access denied: cannot resolve path".into()),
+            },
+        }
+    };
+
+    let mut resolved = resolved_existing;
+    for name in tail.into_iter().rev() {
+        resolved.push(name);
+    }
+
+    if !resolved.starts_with(&root_canon) {
+        return Err("Access denied: path outside workspace".into());
+    }
+    Ok(resolved)
 }
 
 #[derive(Serialize)]
@@ -97,22 +152,15 @@ pub fn cmd_read_rules(state: State<WorkspaceState>) -> Result<Option<String>, St
 
 #[tauri::command]
 pub fn cmd_read_file_workspace(state: State<WorkspaceState>, relative_path: String) -> Result<String, String> {
-    let root = state.root.lock().map_err(|e| format!("{}", e))?;
-    let full = root.join(&relative_path);
-    // Security: ensure the path is within workspace
-    if !full.starts_with(&*root) {
-        return Err("Access denied: path outside workspace".into());
-    }
+    let root = state.root_path();
+    let full = resolve_within(&root, &relative_path)?;
     fs::read_to_string(&full).map_err(|e| format!("{}", e))
 }
 
 #[tauri::command]
 pub fn cmd_write_file_workspace(state: State<WorkspaceState>, relative_path: String, content: String) -> Result<(), String> {
-    let root = state.root.lock().map_err(|e| format!("{}", e))?;
-    let full = root.join(&relative_path);
-    if !full.starts_with(&*root) {
-        return Err("Access denied: path outside workspace".into());
-    }
+    let root = state.root_path();
+    let full = resolve_within(&root, &relative_path)?;
     if let Some(parent) = full.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("{}", e))?;
     }
@@ -121,15 +169,11 @@ pub fn cmd_write_file_workspace(state: State<WorkspaceState>, relative_path: Str
 
 #[tauri::command]
 pub fn cmd_list_dir_workspace(state: State<WorkspaceState>, relative_path: Option<String>) -> Result<Vec<(String, bool)>, String> {
-    let root = state.root.lock().map_err(|e| format!("{}", e))?;
-    let dir = if let Some(rel) = relative_path {
-        root.join(&rel)
-    } else {
-        root.clone()
+    let root = state.root_path();
+    let dir = match relative_path {
+        Some(rel) => resolve_within(&root, &rel)?,
+        None => root.clone(),
     };
-    if !dir.starts_with(&*root) {
-        return Err("Access denied: path outside workspace".into());
-    }
     let entries = fs::read_dir(&dir).map_err(|e| format!("{}", e))?;
     let mut result = Vec::new();
     for entry in entries.flatten() {

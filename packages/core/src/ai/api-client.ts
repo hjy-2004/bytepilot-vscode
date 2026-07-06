@@ -6,6 +6,21 @@ import { logWarn } from '../platform/logger';
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 const MAX_RETRIES = 3;
 const BASE_DELAY = 1000; // 1s initial backoff
+const MAX_RETRY_AFTER_MS = 60_000; // cap server-requested waits at 60s
+
+/** Parse a Retry-After header (delta-seconds or HTTP-date) into milliseconds. */
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const secs = Number(value);
+  if (Number.isFinite(secs)) {
+    return Math.min(Math.max(secs, 0) * 1000, MAX_RETRY_AFTER_MS);
+  }
+  const dateMs = Date.parse(value);
+  if (!Number.isNaN(dateMs)) {
+    return Math.min(Math.max(dateMs - Date.now(), 0), MAX_RETRY_AFTER_MS);
+  }
+  return undefined;
+}
 
 async function fetchWithRetry(
   url: string,
@@ -14,18 +29,23 @@ async function fetchWithRetry(
 ): Promise<Response> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    let retryAfterMs: number | undefined;
     try {
       const res = await fetch(url, init);
       if (res.ok || !RETRYABLE_STATUSES.has(res.status) || attempt === retries) {
         return res;
       }
+      // Respect the server's Retry-After hint (seconds or HTTP-date) when present.
+      retryAfterMs = parseRetryAfter(res.headers.get('retry-after'));
       lastError = new Error(`HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
     } catch (err: any) {
       lastError = err;
       if (err.name === 'AbortError') throw err;
     }
     if (attempt < retries) {
-      const delay = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 500;
+      const backoff = BASE_DELAY * Math.pow(2, attempt) + Math.random() * 500;
+      // Use the larger of exponential backoff and the server's Retry-After.
+      const delay = retryAfterMs !== undefined ? Math.max(retryAfterMs, backoff) : backoff;
       await new Promise(r => setTimeout(r, delay));
     }
   }
@@ -584,7 +604,9 @@ async function streamChatGeminiNative(
   signal?: AbortSignal,
 ): Promise<StreamResult> {
   const baseURL = config.baseURL || 'https://generativelanguage.googleapis.com';
-  const url = `${baseURL}/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+  // Pass the key via header (x-goog-api-key) instead of the query string so it
+  // does not leak into logs, proxies, or browser history.
+  const url = `${baseURL}/v1beta/models/${config.model}:streamGenerateContent?alt=sse`;
   const contents = toGeminiContents(messages);
   const systemMsg = messages.find(m => m.role === 'system');
   let text = '';
@@ -605,7 +627,7 @@ async function streamChatGeminiNative(
 
   const res = await fetchWithRetry(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey },
     body: JSON.stringify(body),
     signal,
   });

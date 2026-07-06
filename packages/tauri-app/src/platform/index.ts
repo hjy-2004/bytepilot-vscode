@@ -19,10 +19,15 @@ export async function createTauriPlatformContext(): Promise<PlatformContext> {
   const fs = new TauriFileSystem(invoke);
   const config = new TauriConfigStore(invoke);
   const editor = new TauriEditorHost(invoke, wsRoot);
+  // API keys are stored in the OS keychain via the Rust `secrets` module,
+  // never in the plaintext config.json.
   const secrets = {
-    get: async (key: string) => invoke('cmd_get_config', { key }) as Promise<string | undefined>,
-    set: async (key: string, value: string) => { await invoke('cmd_set_config', { key, value }); },
-    delete: async (_key: string) => { /* no-op for now */ },
+    get: async (key: string) => {
+      const v = (await invoke('cmd_secret_get', { key })) as string;
+      return v ? v : undefined;
+    },
+    set: async (key: string, value: string) => { await invoke('cmd_secret_set', { key, value }); },
+    delete: async (key: string) => { await invoke('cmd_secret_delete', { key }); },
     onDidChange: () => ({ dispose: () => {} }),
   };
 

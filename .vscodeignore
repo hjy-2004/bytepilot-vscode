@@ -16,3 +16,9 @@ webview-ui/index.html
 esbuild.config.mjs
 tsconfig.json
 tsconfig.base.json
+.turbo/**
+.github/**
+turbo.json
+eslint.config.mjs
+RELEASE_NOTES_*.md
+webview-ui/tsconfig*.json

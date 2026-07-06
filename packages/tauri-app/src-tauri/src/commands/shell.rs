@@ -4,6 +4,41 @@ use std::sync::{mpsc, Arc, Mutex};
 
 use serde::Serialize;
 
+/// Best-effort blocklist of destructive command patterns, mirroring the VS Code
+/// extension's guard. This is defense-in-depth on top of the approval gate — it
+/// does NOT replace user review of command output.
+fn is_dangerous_command(command: &str) -> bool {
+    let c = command.to_lowercase();
+    // Recursive deletion from root / system dirs
+    let patterns: &[&str] = &[
+        "rm -rf /", "rm -fr /", "rm -rf /etc", "rm -rf /home", "rm -rf ~",
+        "rmdir /", "deltree", ":(){ :|:& };:", ":|:&",
+        "mkfs", "dd if=", "> /dev/sd", "of=/dev/",
+        "git reset --hard", "git clean -fd",
+        "shutdown", "reboot", "halt", "poweroff",
+        "chmod -r 777 /", "chmod 777 /",
+    ];
+    for p in patterns {
+        if c.contains(p) {
+            return true;
+        }
+    }
+    // curl/wget piped to a shell
+    if (c.contains("curl ") || c.contains("wget ")) && (c.contains("| sh") || c.contains("|sh") || c.contains("| bash") || c.contains("|bash")) {
+        return true;
+    }
+    // Force push to protected branches
+    if c.contains("git push") && (c.contains("--force") || c.contains("-f "))
+        && (c.contains("main") || c.contains("master") || c.contains("release") || c.contains("prod")) {
+        return true;
+    }
+    // Windows disk format: format C: /q
+    if c.contains("format ") && c.contains(":") && c.contains("/q") {
+        return true;
+    }
+    false
+}
+
 #[derive(Serialize)]
 pub struct CommandResult {
     stdout: String,
@@ -18,6 +53,14 @@ pub fn cmd_execute_command(
     cwd: String,
     timeout_ms: u64,
 ) -> Result<CommandResult, String> {
+    if is_dangerous_command(&command) {
+        return Ok(CommandResult {
+            stdout: String::new(),
+            stderr: "Blocked: dangerous command pattern detected.".into(),
+            exit_code: -1,
+            killed: false,
+        });
+    }
     let (shell, flag) = if cfg!(target_os = "windows") {
         ("cmd", "/C")
     } else {
@@ -68,7 +111,7 @@ pub fn cmd_execute_command(
         }
         Err(mpsc::RecvTimeoutError::Timeout) => {
             // Timed out — kill by PID since the Child handle was taken by the thread
-            kill_by_pid(pid);
+            kill_by_pid(Some(pid));
             Ok(CommandResult {
                 stdout: String::new(),
                 stderr: format!("Command timed out after {}ms and was killed", timeout_ms),
@@ -78,7 +121,7 @@ pub fn cmd_execute_command(
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => {
             // Thread panicked — try to clean up
-            kill_by_pid(pid);
+            kill_by_pid(Some(pid));
             Err("Command process terminated unexpectedly".into())
         }
     }

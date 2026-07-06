@@ -1,47 +1,38 @@
 use std::path::{Path, PathBuf};
-use tauri::AppHandle;
+use tauri::State;
 
-/// Resolve the workspace root. For desktop app, this is the directory where the
-/// app was launched, or a user-configured project directory.
-fn get_workspace_root(_app: &AppHandle) -> PathBuf {
-    // Default to the current working directory (where the user launched the app)
-    // In the future, this could be set from a config file or CLI arg.
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+use crate::commands::workspace::{resolve_within, WorkspaceState};
+
+/// Resolve the workspace root from the shared, user-configurable WorkspaceState
+/// so all FS commands agree on the same boundary as workspace.rs.
+fn get_workspace_root(state: &State<WorkspaceState>) -> PathBuf {
+    state.root_path()
 }
 
-/// Verify that an absolute path is within the workspace root.
-/// Returns Ok(canonicalized absolute path) or Err with a message.
-fn check_within_workspace(app: &AppHandle, path: &str, label: &str) -> Result<PathBuf, String> {
-    let root = get_workspace_root(app);
-    let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
-    let target = Path::new(path);
-    // Resolve the target path (including canonicalization to catch .. traversal)
-    let target_canon = target.canonicalize().map_err(|e| {
-        format!("Cannot access {}: {}", label, e)
-    })?;
-    if !target_canon.starts_with(&root_canon) {
-        return Err(format!(
-            "Access denied: {} is outside workspace",
-            label
-        ));
-    }
-    Ok(target_canon)
+/// Verify that a path (relative or absolute) is within the workspace root.
+/// Returns Ok(safe absolute path) or Err with a message.
+fn check_within_workspace(
+    state: &State<WorkspaceState>,
+    path: &str,
+    _label: &str,
+) -> Result<PathBuf, String> {
+    resolve_within(&get_workspace_root(state), path)
 }
 
 #[tauri::command]
-pub fn cmd_get_workspace_root(app: tauri::AppHandle) -> Result<String, String> {
-    Ok(get_workspace_root(&app).to_string_lossy().to_string())
+pub fn cmd_get_workspace_root(state: State<WorkspaceState>) -> Result<String, String> {
+    Ok(get_workspace_root(&state).to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub fn cmd_read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let safe = check_within_workspace(&app, &path, "read_file")?;
+pub fn cmd_read_file(state: State<WorkspaceState>, path: String) -> Result<String, String> {
+    let safe = check_within_workspace(&state, &path, "read_file")?;
     std::fs::read_to_string(&safe).map_err(|e| format!("{}", e))
 }
 
 #[tauri::command]
-pub fn cmd_write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
-    let safe = check_within_workspace(&app, &path, "write_file")?;
+pub fn cmd_write_file(state: State<WorkspaceState>, path: String, content: String) -> Result<(), String> {
+    let safe = check_within_workspace(&state, &path, "write_file")?;
     if let Some(parent) = safe.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("{}", e))?;
     }
@@ -49,14 +40,14 @@ pub fn cmd_write_file(app: tauri::AppHandle, path: String, content: String) -> R
 }
 
 #[tauri::command]
-pub fn cmd_create_dir(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    let safe = check_within_workspace(&app, &path, "create_dir")?;
+pub fn cmd_create_dir(state: State<WorkspaceState>, path: String) -> Result<(), String> {
+    let safe = check_within_workspace(&state, &path, "create_dir")?;
     std::fs::create_dir_all(&safe).map_err(|e| format!("{}", e))
 }
 
 #[tauri::command]
-pub fn cmd_read_dir(app: tauri::AppHandle, path: String) -> Result<Vec<(String, bool)>, String> {
-    let safe = check_within_workspace(&app, &path, "read_dir")?;
+pub fn cmd_read_dir(state: State<WorkspaceState>, path: String) -> Result<Vec<(String, bool)>, String> {
+    let safe = check_within_workspace(&state, &path, "read_dir")?;
     let entries = std::fs::read_dir(&safe).map_err(|e| format!("{}", e))?;
     let mut result = Vec::new();
     for entry in entries {
@@ -77,8 +68,8 @@ pub struct FileStat {
 }
 
 #[tauri::command]
-pub fn cmd_stat(app: tauri::AppHandle, path: String) -> Result<FileStat, String> {
-    let safe = check_within_workspace(&app, &path, "stat")?;
+pub fn cmd_stat(state: State<WorkspaceState>, path: String) -> Result<FileStat, String> {
+    let safe = check_within_workspace(&state, &path, "stat")?;
     let meta = std::fs::metadata(&safe).map_err(|e| format!("{}", e))?;
     Ok(FileStat {
         size: meta.len(),
@@ -88,14 +79,14 @@ pub fn cmd_stat(app: tauri::AppHandle, path: String) -> Result<FileStat, String>
 }
 
 #[tauri::command]
-pub fn cmd_exists(app: tauri::AppHandle, path: String) -> Result<bool, String> {
-    let safe = check_within_workspace(&app, &path, "exists")?;
+pub fn cmd_exists(state: State<WorkspaceState>, path: String) -> Result<bool, String> {
+    let safe = check_within_workspace(&state, &path, "exists")?;
     Ok(safe.exists())
 }
 
 #[tauri::command]
 pub fn cmd_find_files(
-    app: tauri::AppHandle,
+    state: State<WorkspaceState>,
     base_path: String,
     include: String,
     exclude: String,
@@ -110,9 +101,9 @@ pub fn cmd_find_files(
 
     // Validate base_path is within workspace, or use workspace root if empty
     let base = if base_path.is_empty() {
-        get_workspace_root(&app)
+        get_workspace_root(&state)
     } else {
-        check_within_workspace(&app, &base_path, "find_files base_path")?
+        check_within_workspace(&state, &base_path, "find_files base_path")?
     };
     let pattern = include.trim_start_matches("**/").to_string();
 
@@ -159,12 +150,12 @@ pub fn cmd_find_files(
 }
 
 #[tauri::command]
-pub fn cmd_resolve_path(app: tauri::AppHandle, relative: String) -> String {
-    let root = get_workspace_root(&app);
+pub fn cmd_resolve_path(state: State<WorkspaceState>, relative: String) -> String {
+    let root = get_workspace_root(&state);
     root.join(&relative).to_string_lossy().to_string()
 }
 
 #[tauri::command]
-pub fn cmd_is_within_workspace(app: tauri::AppHandle, absolute: String) -> bool {
-    check_within_workspace(&app, &absolute, "path").is_ok()
+pub fn cmd_is_within_workspace(state: State<WorkspaceState>, absolute: String) -> bool {
+    check_within_workspace(&state, &absolute, "path").is_ok()
 }
