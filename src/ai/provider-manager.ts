@@ -10,6 +10,11 @@ import { validateConfig } from '../config/validator';
 import { logInfo, logError } from '../utils/logger';
 import { ChatPanel } from '../chat/panel';
 import type { ProviderConfig } from '../types/ai';
+import {
+  getProviderPreset,
+  detectApiFormat,
+  buildProviderEnv,
+} from '@bytepilot/core';
 
 /**
  * Central manager for AI provider lifecycle.
@@ -67,6 +72,10 @@ export class ProviderManager implements vscode.Disposable {
 
       logInfo(`Provider reloaded: ${settingsConfig.provider} (chat: ${settingsConfig.chatModel})`);
 
+      // Sync provider config to ~/.bytepilot/settings.json
+      // when the user has explicitly configured a provider.
+      this.writeAICodingAgentSettings(settingsConfig, apiKey);
+
       // Push updated config to the chat panel if it's open
       const panel = ChatPanel.current();
       if (panel) {
@@ -121,34 +130,60 @@ export class ProviderManager implements vscode.Disposable {
         || env.ANTHROPIC_API_KEY
         || env.OPENAI_API_KEY;
 
-      if (key) {
-        const vscConfig = vscode.workspace.getConfiguration('aiCodingAgent');
-        // Auto-apply baseURL and model if not already set.
-        // Use !== undefined (not !!) so that empty string counts as "already set".
-        const hasBaseURL = vscConfig.inspect('baseURL')?.globalValue !== undefined;
-        const hasModel = vscConfig.inspect('chatModel')?.globalValue !== undefined;
-        if (!hasBaseURL && env.ANTHROPIC_BASE_URL) {
-          vscConfig.update('baseURL', env.ANTHROPIC_BASE_URL, vscode.ConfigurationTarget.Global);
-        }
-        if (!hasModel && env.ANTHROPIC_MODEL) {
-          vscConfig.update('chatModel', env.ANTHROPIC_MODEL, vscode.ConfigurationTarget.Global);
-        }
-        // Auto-set provider if not configured
-        if (vscConfig.inspect('provider')?.globalValue === undefined) {
-          vscConfig.update('provider', 'anthropic', vscode.ConfigurationTarget.Global);
-        }
-        // Notify user that credentials were imported from Claude Code config
-        const sourcePath = path.join(os.homedir(), '.claude', 'settings.json');
-        logInfo(`Imported API credentials from Claude Code config: ${sourcePath}`);
-        vscode.window.showInformationMessage(
-          `BytePilot: Imported AI credentials from Claude Code configuration (${sourcePath}). ` +
-          `To use a different provider, run "Configure AI Provider".`
-        );
-      }
+      // Return the API key only — do NOT auto-apply settings.
+      // Users must explicitly configure their provider via "Configure AI Provider".
 
       return key || undefined;
     } catch {
       return undefined;
+    }
+  }
+
+  /**
+   * Write the current provider configuration to ~/.bytepilot/settings.json.
+   * This file is read by external AI coding tools for cross-tool provider sharing.
+   */
+  private writeAICodingAgentSettings(
+    settingsConfig: ProviderConfig,
+    apiKey?: string,
+  ): void {
+    // Only write when the user has explicitly configured settings
+    // (not using VS Code's package.json defaults)
+    const inspection = vscode.workspace.getConfiguration('aiCodingAgent').inspect('provider');
+    const isUserConfigured = !!(inspection?.globalValue || inspection?.workspaceValue);
+    if (!isUserConfigured || !settingsConfig.provider) return;
+
+    try {
+      const dir = path.join(os.homedir(), '.bytepilot');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const preset = getProviderPreset(settingsConfig.provider);
+      const apiFormat = detectApiFormat(settingsConfig.provider, settingsConfig.baseURL);
+      const baseURL = settingsConfig.baseURL || preset?.baseURL || '';
+      const chatModel = settingsConfig.chatModel;
+      const completionModel = settingsConfig.completionModel || chatModel;
+
+      // API key is written in plain text so the user can manually edit it.
+      const env = buildProviderEnv(apiFormat, baseURL, apiKey || '', chatModel, completionModel);
+
+      const settings = {
+        provider: preset?.id || settingsConfig.provider,
+        providerName: preset?.name || settingsConfig.provider,
+        apiFormat,
+        baseURL,
+        chatModel,
+        completionModel,
+        env,
+      };
+
+      const filePath = path.join(dir, 'settings.json');
+      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
+      logInfo(`Synced provider config to ${filePath}`);
+    } catch (err) {
+      // Non-fatal: settings.json sync failure should not break the extension
+      logError('Failed to write .bytepilot/settings.json', err);
     }
   }
 

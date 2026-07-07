@@ -8,11 +8,11 @@ import type { UnifiedDiff } from '../types/diff';
 
 /**
  * Session persistence following Claude Code's pattern:
- * - Sessions stored as individual .jsonl files in ~/.ai-coding-agent/projects/<hash>/
+ * - Sessions stored as individual .jsonl files in ~/.bytepilot/projects/<hash>/
  * - Analogous to ~/.claude/projects/<slug>/<session-id>.jsonl
  */
 
-const BASE_DIR = path.join(os.homedir(), '.ai-coding-agent', 'projects');
+const BASE_DIR = path.join(os.homedir(), '.bytepilot', 'projects');
 const MAX_ENTRIES = 200;
 
 // ============================================================

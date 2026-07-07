@@ -55,7 +55,7 @@ interface AppCfg { provider:string; chatModel:string; completionModel:string; ba
 interface ApiKey { pid:string; key:string; }
 interface ProjEntry { name:string; path:string; is_dir:boolean; }
 
-const DEF_CFG:AppCfg={provider:'anthropic',chatModel:'claude-sonnet-4-6',completionModel:'',baseURL:'https://api.anthropic.com/v1',temperature:0.7,maxTokens:4096,completionsEnabled:true,availableModels:[],initialized:true,displayProvider:'Anthropic (Desktop)'};
+const DEF_CFG:AppCfg={provider:'',chatModel:'',completionModel:'',baseURL:'',temperature:0.7,maxTokens:4096,completionsEnabled:true,availableModels:[],initialized:false,displayProvider:''};
 
 let cfg={...DEF_CFG};
 let keys:ApiKey[]=[];
@@ -135,6 +135,40 @@ async function saveCfg(){
     await invoke!('cmd_set_config',{key:'provider',value:cfg.provider});
     await invoke!('cmd_set_config',{key:'chatModel',value:cfg.chatModel});
     await invoke!('cmd_set_config',{key:'baseURL',value:cfg.baseURL});
+
+    // Also sync the full provider preset to ~/.bytepilot/settings.json
+    const pr = PRESETS[cfg.provider];
+    if (pr) {
+      const apiKey = keys.find(k => k.pid === cfg.provider)?.key || '';
+      const env: Record<string, string> = { API_TIMEOUT_MS: '3000000' };
+      const isDeepSeek = pr.url.includes('deepseek.com');
+      const isGoogle = pr.url.includes('generativelanguage.googleapis.com');
+      if (isGoogle) {
+        env['GOOGLE_API_KEY'] = apiKey;
+      } else {
+        // Anthropic-compat and OpenAI-compat both use these env vars
+        if (!isDeepSeek) {
+          env['ANTHROPIC_BASE_URL'] = pr.url;
+          env['ANTHROPIC_MODEL'] = cfg.chatModel;
+          env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = cfg.chatModel;
+          env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = cfg.completionModel || cfg.chatModel;
+          env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = cfg.chatModel;
+          env['ANTHROPIC_AUTH_TOKEN'] = apiKey;
+        }
+        env['OPENAI_BASE_URL'] = pr.url;
+        env['OPENAI_API_KEY'] = apiKey;
+      }
+      await invoke!('cmd_sync_provider', {
+        provider: pr.id,
+        providerName: pr.name,
+        apiFormat: isGoogle ? 'google' : (pr.id === 'anthropic' && !pr.url.includes('deepseek.com') ? 'anthropic' : 'openai_compat'),
+        baseUrl: pr.url,
+        chatModel: cfg.chatModel,
+        completionModel: cfg.completionModel || cfg.chatModel,
+        env,
+      });
+    }
+
     console.log('[Adapter] Config saved:',cfg.provider,cfg.chatModel);
   }catch(e){console.error('[Adapter] Save error:',e)}
 }

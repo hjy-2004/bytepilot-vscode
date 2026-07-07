@@ -29,10 +29,10 @@ function getStore(): IConfigStore {
  */
 export function readConfig(): ProviderConfig {
   const config = getStore();
-  const provider = (config.get<string>('provider', 'anthropic')) as ProviderId;
-  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS['anthropic'];
+  const provider = config.get<string>('provider', '') as ProviderId;
+  const defaults = PROVIDER_DEFAULTS[provider] || { chatModel: '', completionModel: '' };
 
-  const chatModel = cleanModelName(config.get<string>('chatModel', '') || defaults.chatModel);
+  const chatModel = cleanModelName(config.get<string>('chatModel', '') || defaults.chatModel || '');
   const completionModel = cleanModelName(config.get<string>('completionModel', '') || chatModel);
   const baseURL = config.get<string>('baseURL', '') || undefined;
   const temperature = config.get<number>('temperature', 0.7);
@@ -86,10 +86,10 @@ export function getConfigState(): {
   baseURL?: string;
 } {
   const config = getStore();
-  const provider = (config.get<string>('provider', 'anthropic')) as ProviderId;
+  const provider = config.get<string>('provider', '') as ProviderId;
   const baseURL = config.get<string>('baseURL', '') || undefined;
-  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS['anthropic'];
-  const chatModel = cleanModelName(config.get<string>('chatModel', '') || defaults.chatModel);
+  const defaults = PROVIDER_DEFAULTS[provider] || { chatModel: '', completionModel: '' };
+  const chatModel = cleanModelName(config.get<string>('chatModel', '') || defaults.chatModel || '');
   const displayProvider = getDisplayProvider(provider, baseURL, chatModel);
 
   // Check if user has actually configured anything beyond defaults

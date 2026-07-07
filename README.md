@@ -23,14 +23,16 @@
 - **Multi-Provider** — 60+ 供应商预设，支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama / Kimi / 智谱 / MiniMax / 阶跃星辰 / 火山方舟 / OpenRouter / SiliconFlow 等
 - **Provider Categories** — 供应商按 5 大分类展示（官方 / 国产官方 / 聚合商 / 第三方 / 云服务商）
 - **Model Fetching** — 点击 🔄 一键从供应商 API 拉取实时模型列表
-- **Per-Provider API Key** — 每个供应商独立存储 API key（VS Code 用系统 SecretStorage，桌面端用 OS 系统凭据库 keychain，绝不明文落盘）
+- **Per-Provider API Key** — 每个供应商独立存储 API key，写入 `~/.bytepilot/settings.json`，方便手动编辑和跨工具共享
+- **Shared Config** — 插件和桌面端共享 `~/.bytepilot/settings.json`，一端配置另一端自动沿用
+- **Empty by Default** — 首次启动不预设供应商/模型，用户自行选择后才会写入配置文件
 - **Slash Commands `/`** — 输入 `/` 弹出命令菜单
 - **Input History** — `↑`/`↓` 键浏览历史消息（最多 50 条）
 - **Image Paste & Upload** — 粘贴图片或点击按钮本地上传
 - **Semantic Search** — BM25 关键词搜索（非语义/Embedding 搜索）
 - **CJK Token Counting** — 中/日/韩文字符感知的 token 估算（~1.5 chars/token vs ASCII ~4）
 - **Project Rules** — `.bytepilotrules` 自动注入 AI system prompt
-- **Auto Config** — 首次启动自动读取 `.claude/settings.json`（会弹窗提示）
+- **Auto Config** — 首次启动自动创建 `~/.bytepilot/settings.json` 空占位文件，可从 `.claude/settings.json` 一键导入配置
 - **Multi-Session** — JSONL 持久化，创建/切换/删除会话
 - **Structured Logging** — 统一日志（桌面端支持文件日志 `%APPDATA%/BytePilot/logs/`）
 - **Cross-Platform** — 70%+ 代码在 VS Code 和桌面端之间共享
@@ -134,12 +136,34 @@ extension_plugin/
 
 或在 Tauri 窗口按 **F12** 打开 DevTools → Console 查看实时日志。
 
+## 配置文件
+
+插件和桌面端共享 `~/.bytepilot/settings.json`，**首次启动自动创建空占位文件**，内容由用户配置后填充：
+
+```json
+{
+  "provider": "deepseek",
+  "providerName": "DeepSeek",
+  "apiFormat": "openai_compat",
+  "baseURL": "https://api.deepseek.com/v1",
+  "chatModel": "deepseek-v4-pro",
+  "completionModel": "deepseek-v4-pro",
+  "env": {
+    "OPENAI_API_KEY": "sk-...",
+    "OPENAI_BASE_URL": "https://api.deepseek.com/v1",
+    "API_TIMEOUT_MS": "3000000"
+  }
+}
+```
+
+`env` 块与 `.claude/settings.json` 格式兼容，支持 CLI 工具直接读取。
+
 ## 设置项
 
 | 设置 | 默认 | 说明 |
 |------|------|------|
-| `aiCodingAgent.provider` | `anthropic` | 厂商 |
-| `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | 对话模型 |
+| `aiCodingAgent.provider` | (空) | 厂商，需手动选择 |
+| `aiCodingAgent.chatModel` | (空) | 对话模型 |
 | `aiCodingAgent.completionModel` | (空) | 补全模型 |
 | `aiCodingAgent.baseURL` | (空) | 自定义 API 地址 |
 | `aiCodingAgent.temperature` | `0.7` | 创造性 |

@@ -69,6 +69,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const secretsStore = new SecretsStore(context.secrets);
   disposables.add(secretsStore);
 
+  // Sync from ~/.bytepilot/settings.json if it already exists
+  // (e.g. was created by Tauri desktop or a previous session).
+  // If the file was deleted, this also clears stale VS Code settings + stored API keys.
+  await syncFromSettingsFile(secretsStore);
+
   providerManager = new ProviderManager(secretsStore);
   disposables.add(providerManager);
   await providerManager.initialize();
@@ -224,6 +229,67 @@ function updateCompletionEngine(): void {
     inlineProvider?.setProviderProvider(() => providerManager.getConfig()?.provider);
   } catch (err) {
     logError('Failed to create completion engine', err);
+  }
+}
+
+/**
+ * On startup, sync config between ~/.bytepilot/settings.json and VS Code settings.
+ *
+ * - If settings.json exists and has a provider → apply it to VS Code settings.
+ * - If settings.json does NOT exist → clear stale VS Code settings so the user
+ *   starts from a clean slate (no pre-selected provider).
+ */
+async function syncFromSettingsFile(secretsStore: SecretsStore): Promise<void> {
+  try {
+    const filePath = path.join(os.homedir(), '.bytepilot', 'settings.json');
+    const vscConfig = vscode.workspace.getConfiguration('aiCodingAgent');
+
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      if (!data.provider) return;
+
+      // Apply settings.json config to VS Code settings
+      await vscConfig.update('provider', data.provider, vscode.ConfigurationTarget.Global);
+      if (data.chatModel) {
+        await vscConfig.update('chatModel', data.chatModel, vscode.ConfigurationTarget.Global);
+      }
+      if (data.baseURL) {
+        await vscConfig.update('baseURL', data.baseURL, vscode.ConfigurationTarget.Global);
+      }
+      // Also sync API key from settings.json to SecretStorage
+      if (data.env) {
+        const apiKey = data.env.ANTHROPIC_AUTH_TOKEN
+          || data.env.ANTHROPIC_API_KEY
+          || data.env.OPENAI_API_KEY
+          || data.env.GOOGLE_API_KEY;
+        if (apiKey) {
+          await secretsStore.setApiKey(data.provider, apiKey);
+        }
+      }
+      logInfo(`Synced provider from ${filePath}: ${data.provider}/${data.chatModel}`);
+    } else {
+      // settings.json doesn't exist — create empty placeholder AND clear
+      // any stale VS Code settings so old values don't get written back.
+      await vscConfig.update('provider', undefined, vscode.ConfigurationTarget.Global);
+      await vscConfig.update('chatModel', undefined, vscode.ConfigurationTarget.Global);
+      await vscConfig.update('baseURL', undefined, vscode.ConfigurationTarget.Global);
+
+      const dir = path.join(os.homedir(), '.bytepilot');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const emptySettings = {
+        provider: '',
+        providerName: '',
+        apiFormat: '',
+        baseURL: '',
+        chatModel: '',
+        completionModel: '',
+        env: {},
+      };
+      fs.writeFileSync(filePath, JSON.stringify(emptySettings, null, 2), 'utf-8');
+      logInfo(`Created empty settings placeholder at ${filePath}`);
+    }
+  } catch {
+    // Non-fatal
   }
 }
 
@@ -479,7 +545,7 @@ function registerCommands(context: vscode.ExtensionContext, secretsStore: Secret
     vscode.commands.registerCommand('aiCodingAgent.debugSessions', async () => {
       const ws = getWorkspaceRoot();
       const dbgLines: string[] = [];
-      const sessionDir = path.join(os.homedir(), '.ai-coding-agent', 'projects');
+      const sessionDir = path.join(os.homedir(), '.bytepilot', 'projects');
       dbgLines.push(`Session DB dir: ${sessionDir}`);
       dbgLines.push(`Workspace: ${ws}`);
       dbgLines.push(`Active session: ${messageRouter?.getActiveSession() || 'N/A'}`);

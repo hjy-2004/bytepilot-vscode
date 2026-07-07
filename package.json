@@ -107,6 +107,7 @@
         "aiCodingAgent.provider": {
           "type": "string",
           "enum": [
+            "",
             "openai",
             "anthropic",
             "ollama",
@@ -115,12 +116,12 @@
             "azure-openai",
             "openai-compatible"
           ],
-          "default": "anthropic",
+          "default": "",
           "description": "AI provider to use for chat and completions. 'openai-compatible' is a generic catch-all for providers with OpenAI-compatible APIs (OpenRouter, SiliconFlow, etc.)."
         },
         "aiCodingAgent.chatModel": {
           "type": "string",
-          "default": "claude-sonnet-4-6",
+          "default": "",
           "description": "Model ID for chat conversations."
         },
         "aiCodingAgent.completionModel": {

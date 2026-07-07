@@ -22,7 +22,9 @@ Cursor-like AI coding assistant supporting both **VS Code extension** and **Taur
 - **Tool System** — 8 built-in tools: read / write / edit / search / list / command / diagnostics / diff
 - **Multi-Provider** — 60+ provider presets: Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama, plus Kimi / Zhipu / MiniMax / StepFun / Volcano / OpenRouter / SiliconFlow and more
 - **Model Fetching** — Click 🔄 to fetch live model lists from provider APIs
-- **Per-Provider API Key** — Store API keys independently per provider (VS Code uses the system SecretStorage, desktop uses the OS keychain — never written to disk in plaintext)
+- **Per-Provider API Key** — API keys stored in `~/.bytepilot/settings.json` for easy manual editing and cross-tool sharing
+- **Shared Config** — VS Code extension and desktop app share `~/.bytepilot/settings.json` — configure once, available everywhere
+- **Empty by Default** — No pre-selected provider or model on first launch; the user must explicitly configure before the config file is populated
 - **Keyword Search** — BM25-based code search engine (not semantic/embedding search)
 - **CJK Token Counting** — CJK-aware token estimation (~1.5 chars/token for Chinese/Japanese/Korean, ~4 for ASCII)
 - **Structured Logging** — File-based logging on desktop (`%APPDATA%/BytePilot/logs/`)
@@ -125,12 +127,34 @@ Desktop logs are written to `%APPDATA%/BytePilot/logs/bytepilot.log` with automa
 
 Press **F12** in the Tauri window to open DevTools → Console for real-time logs.
 
+## Configuration File
+
+Both the extension and desktop app share `~/.bytepilot/settings.json`. An **empty placeholder is auto-created on first launch** and populated when the user configures a provider:
+
+```json
+{
+  "provider": "deepseek",
+  "providerName": "DeepSeek",
+  "apiFormat": "openai_compat",
+  "baseURL": "https://api.deepseek.com/v1",
+  "chatModel": "deepseek-v4-pro",
+  "completionModel": "deepseek-v4-pro",
+  "env": {
+    "OPENAI_API_KEY": "sk-...",
+    "OPENAI_BASE_URL": "https://api.deepseek.com/v1",
+    "API_TIMEOUT_MS": "3000000"
+  }
+}
+```
+
+The `env` block is compatible with `.claude/settings.json` format for CLI tool interop.
+
 ## Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `aiCodingAgent.provider` | `anthropic` | AI provider |
-| `aiCodingAgent.chatModel` | `claude-sonnet-4-6` | Chat model |
+| `aiCodingAgent.provider` | (empty) | AI provider — must be manually selected |
+| `aiCodingAgent.chatModel` | (empty) | Chat model |
 | `aiCodingAgent.completionModel` | (empty) | Completion model |
 | `aiCodingAgent.baseURL` | (empty) | Custom API endpoint |
 | `aiCodingAgent.temperature` | `0.7` | Creativity |

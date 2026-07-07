@@ -18,6 +18,7 @@ export async function createTauriPlatformContext(): Promise<PlatformContext> {
   const wsRoot = (await invoke('cmd_get_workspace_root')) as string;
   const fs = new TauriFileSystem(invoke);
   const config = new TauriConfigStore(invoke);
+  await config.init();
   const editor = new TauriEditorHost(invoke, wsRoot);
   // API keys are stored in the OS keychain via the Rust `secrets` module,
   // never in the plaintext config.json.

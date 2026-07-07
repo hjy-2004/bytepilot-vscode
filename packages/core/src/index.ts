@@ -42,7 +42,16 @@ export {
   findPresetByURL,
   getModelListCandidates,
   resolveProviderConfig,
+  buildProviderEnv,
 } from './config/provider-presets';
+export {
+  buildSettingsFromPreset,
+  generateEnvBlock,
+  resolveSettingsProvider,
+  createDefaultSettings,
+  type AppSettings,
+  type ProviderOverrides,
+} from './config/settings-manager';
 export { validateConfig } from './config/validator';
 
 // ── Session ───────────────────────────────────────────────────────────

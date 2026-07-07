@@ -23,6 +23,7 @@ pub fn run() {
             // Config
             cmd_get_config,
             cmd_set_config,
+            cmd_sync_provider,
             // Secrets (OS keychain)
             cmd_secret_get,
             cmd_secret_set,

@@ -181,6 +181,70 @@ export function resolveProviderConfig(
   return { baseURL, chatModel, completionModel, apiFormat };
 }
 
+// ── Settings.json env block generation ──────────────────────────────────────────
+
+/**
+ * Build the `env` block for settings.json based on provider apiFormat.
+ *
+ * The env block provides environment variables that CLI tools (Claude Code, etc.)
+ * can read to configure the AI provider connection.
+ *
+ * - anthropic → ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL, ANTHROPIC_MODEL, etc.
+ * - openai_chat / openai_compat → OPENAI_API_KEY, OPENAI_BASE_URL
+ * - google → GOOGLE_API_KEY
+ */
+export function buildProviderEnv(
+  apiFormat: string,
+  baseURL: string,
+  apiKey: string,
+  chatModel: string,
+  completionModel: string,
+): Record<string, string> {
+  const env: Record<string, string> = {
+    API_TIMEOUT_MS: '3000000',
+  };
+
+  switch (apiFormat) {
+    case 'anthropic': {
+      if (apiKey) env['ANTHROPIC_AUTH_TOKEN'] = apiKey;
+      if (baseURL) env['ANTHROPIC_BASE_URL'] = baseURL;
+      if (chatModel) {
+        env['ANTHROPIC_MODEL'] = chatModel;
+        env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = chatModel;
+        env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = chatModel;
+      }
+      if (completionModel) {
+        env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = completionModel;
+      }
+      break;
+    }
+    case 'openai_chat':
+    case 'openai_compat': {
+      if (apiKey) env['OPENAI_API_KEY'] = apiKey;
+      if (baseURL) env['OPENAI_BASE_URL'] = baseURL;
+      break;
+    }
+    case 'google': {
+      if (apiKey) env['GOOGLE_API_KEY'] = apiKey;
+      break;
+    }
+    default: {
+      // For unknown formats, include both OpenAI and Anthropic env vars
+      if (apiKey) {
+        env['OPENAI_API_KEY'] = apiKey;
+        env['ANTHROPIC_AUTH_TOKEN'] = apiKey;
+      }
+      if (baseURL) {
+        env['OPENAI_BASE_URL'] = baseURL;
+        env['ANTHROPIC_BASE_URL'] = baseURL;
+      }
+      break;
+    }
+  }
+
+  return env;
+}
+
 /** Try to find a preset matching the given baseURL and model. */
 export function findPresetByURL(baseURL: string): ProviderPreset | undefined {
   if (!baseURL) return undefined;
