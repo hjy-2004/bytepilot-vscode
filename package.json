@@ -7,7 +7,7 @@
     "packages/tauri-app"
   ],
   "description": "Cursor-like AI coding assistant for VS Code",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "packageManager": "npm@11.18.0",
   "publisher": "bytepilot",
   "repository": "https://github.com/hjy-2004/bytepilot-vscode",
