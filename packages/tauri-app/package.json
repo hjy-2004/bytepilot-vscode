@@ -1,6 +1,6 @@
 {
   "name": "@bytepilot/tauri-app",
-  "version": "0.6.0",
+  "version": "0.6.5",
   "private": true,
   "description": "BytePilot desktop application powered by Tauri",
   "scripts": {
@@ -15,7 +15,7 @@
     "clean": "set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && cargo clean"
   },
   "dependencies": {
-    "@bytepilot/core": "0.6.0",
+    "@bytepilot/core": "0.6.5",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
