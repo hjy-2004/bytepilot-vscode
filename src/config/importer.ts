@@ -5,6 +5,7 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import { logInfo, logError } from '../utils/logger';
 import type { ProviderId } from '../types/ai';
+import { parseClaudeConfig as parseClaudeConfigCore } from '@bytepilot/core/config/importer';
 
 /**
  * Configuration importer: one-click import from other AI coding tools.
@@ -82,72 +83,27 @@ type ParserFn = (content: string, filePath: string) => ImportedConfig | null;
 // ============================================================
 
 function parseClaudeConfig(content: string, filePath: string): ImportedConfig | null {
+  const parsed = parseClaudeConfigCore(content);
+  if (!parsed) return null;
+
+  // Also check for apiKeyHelper in legacy format (VS Code-specific concept)
+  let apiKeyHelper: string | undefined;
   try {
     const data = JSON.parse(content);
-
-    // Claude Code stores config in two possible formats:
-    // 1. settings.json: { "env": { "ANTHROPIC_AUTH_TOKEN": "...", "ANTHROPIC_BASE_URL": "...", "ANTHROPIC_MODEL": "..." } }
-    // 2. Legacy: { "model": "...", "apiKeyHelper": "...", "baseURL": "..." }
-
-    const env = data.env || {};
-    const isSettingsFormat = Object.keys(env).length > 0;
-
-    let model: string | undefined;
-    let apiKey: string | undefined;
-    let baseURL: string | undefined;
-    let apiKeyHelper: string | undefined;
-
-    if (isSettingsFormat) {
-      // Modern Claude Code format (env-based)
-      apiKey = env.ANTHROPIC_AUTH_TOKEN
-        || env.ANTHROPIC_API_KEY
-        || env.OPENAI_API_KEY
-        || env.API_KEY;
-      baseURL = env.ANTHROPIC_BASE_URL
-        || env.OPENAI_BASE_URL
-        || env.BASE_URL;
-      // Use the primary model, fall back to defaults
-      model = env.ANTHROPIC_MODEL
-        || env.ANTHROPIC_DEFAULT_SONNET_MODEL
-        || env.ANTHROPIC_DEFAULT_OPUS_MODEL
-        || env.ANTHROPIC_DEFAULT_HAIKU_MODEL;
-    } else {
-      // Legacy format
-      model = data.model || data.defaultModel;
-      baseURL = data.baseURL;
-      // Check direct key fields. Note: apiKeyHelper (an arbitrary shell command
-      // read from a file on disk) is NOT executed here — it is captured below
-      // and only run after explicit user consent.
-      apiKey = apiKey || data.apiKey || data.anthropicApiKey || data.openaiApiKey;
-      if (!apiKey && typeof data.apiKeyHelper === 'string' && data.apiKeyHelper.trim()) {
-        apiKeyHelper = data.apiKeyHelper.trim();
-      }
+    if (!data.env && typeof data.apiKeyHelper === 'string' && data.apiKeyHelper.trim()) {
+      apiKeyHelper = data.apiKeyHelper.trim();
     }
+  } catch { /* ignore */ }
 
-    // Infer provider from the environment variables and base URL
-    let provider: ProviderId = 'anthropic';
-    const urlLower = (baseURL || '').toLowerCase();
-    if (urlLower.includes('openai.com') || env.OPENAI_API_KEY) {
-      provider = 'openai';
-    } else if (urlLower.includes('deepseek.com') || env.DEEPSEEK_API_KEY) {
-      provider = 'deepseek';
-    } else if (urlLower.includes('localhost:11434') || urlLower.includes('ollama')) {
-      provider = 'ollama';
-    }
-    // Keep 'anthropic' for any other custom endpoints
-
-    return {
-      provider,
-      apiKey,
-      chatModel: model || undefined,
-      baseURL: baseURL || undefined,
-      source: 'Claude Code',
-      sourcePath: filePath,
-      apiKeyHelper,
-    };
-  } catch {
-    return null;
-  }
+  return {
+    provider: parsed.provider as ProviderId,
+    apiKey: parsed.apiKey,
+    chatModel: parsed.chatModel,
+    baseURL: parsed.baseURL,
+    source: parsed.source,
+    sourcePath: filePath,
+    apiKeyHelper,
+  };
 }
 
 function parseCursorConfig(content: string, filePath: string): ImportedConfig | null {

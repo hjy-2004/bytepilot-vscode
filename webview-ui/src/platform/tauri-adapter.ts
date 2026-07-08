@@ -6,6 +6,9 @@ import type { IPlatformAdapter } from './types';
 import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
 import { runAgentLoop, type AgentCallbacks } from '@bytepilot/core/ai/agent-loop';
 import type { Message } from '@bytepilot/core/ai/message-types';
+import { generateEnvBlock } from '@bytepilot/core/config/settings-manager';
+import { getProviderPreset, detectApiFormat, getAllProviders } from '@bytepilot/core/config/provider-presets';
+import { parseClaudeConfig, stripAnsi, KNOWN_CONFIG_PATHS } from '@bytepilot/core/config/importer';
 
 // ── Tool definitions ─────────────────────────────────────────────────
 
@@ -32,22 +35,6 @@ function mkdiff(fn:string, a:string, b:string):LocDiff|undefined {
   }
   return {fileName:fn,stats:{additions:bl.length-al.length,deletions:al.length-bl.length},hunks:[{oldStart:1,oldLines:al.length,newStart:1,newLines:bl.length,lines:ls}]};
 }
-
-// ── Provider presets ─────────────────────────────────────────────────
-
-const PRESETS:Record<string,{id:string;name:string;url:string;model:string}> = {
-  anthropic:{id:'anthropic',name:'Anthropic',url:'https://api.anthropic.com/v1',model:'claude-sonnet-4-6'},
-  openai:{id:'openai',name:'OpenAI',url:'https://api.openai.com/v1',model:'gpt-4o'},
-  deepseek:{id:'deepseek',name:'DeepSeek',url:'https://api.deepseek.com/v1',model:'deepseek-v4-pro'},
-  google:{id:'google',name:'Google Gemini',url:'https://generativelanguage.googleapis.com/v1beta',model:'gemini-2.5-pro'},
-  ollama:{id:'ollama',name:'Ollama',url:'http://localhost:11434/v1',model:'codellama'},
-  'azure-openai':{id:'azure-openai',name:'Azure OpenAI',url:'',model:'gpt-4o'},
-  moonshot:{id:'moonshot',name:'Kimi',url:'https://api.moonshot.cn/v1',model:'kimi-k2.7-code'},
-  zhipu:{id:'zhipu',name:'GLM',url:'https://open.bigmodel.cn/api/paas/v4',model:'glm-5.1'},
-  minimax:{id:'minimax',name:'MiniMax',url:'https://api.minimaxi.com/v1',model:'MiniMax-M2.7'},
-  openrouter:{id:'openrouter',name:'OpenRouter',url:'https://openrouter.ai/api/v1',model:'openai/gpt-4o'},
-  siliconflow:{id:'siliconflow',name:'SiliconFlow',url:'https://api.siliconflow.cn/v1',model:'deepseek-ai/DeepSeek-V3'},
-};
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -115,12 +102,22 @@ async function initTauri(){
     if(w.__TAURI_INTERNALS__){const i=w.__TAURI_INTERNALS__;invoke=async(c,a)=>i.invoke(c,a)}
     else{invoke=(await import('@tauri-apps/api/core')).invoke}
     if(!invoke)return;
-    // Load config
+    // Load config from ~/.bytepilot/settings.json (shared with VS Code extension)
     try{
       const prov=await invoke('cmd_get_config',{key:'provider'}) as string;
       console.log('[Adapter] Loaded provider from disk:',prov||'(none)');
-      if(prov){cfg.provider=prov;cfg.chatModel=(await invoke('cmd_get_config',{key:'chatModel'})as string)||cfg.chatModel;cfg.baseURL=(await invoke('cmd_get_config',{key:'baseURL'})as string)||cfg.baseURL;cfg.displayProvider=prov+' (Desktop)';cfg.initialized=true;}
-      for(const pid of Object.keys(PRESETS)){try{const k=await invoke('cmd_get_config',{key:`apikey.${pid}`})as string;if(k)keys.push({pid,key:k})}catch{}}
+      if(prov){
+        cfg.provider=prov;
+        cfg.chatModel=(await invoke('cmd_get_config',{key:'chatModel'})as string)||cfg.chatModel;
+        cfg.baseURL=(await invoke('cmd_get_config',{key:'baseURL'})as string)||cfg.baseURL;
+        const displayName = getProviderPreset(prov)?.name || prov;
+        cfg.displayProvider=displayName+' (Desktop)';
+        cfg.initialized=true;
+      }
+      // Load API keys — try all known provider ids from core presets
+      for(const preset of getAllProviders()){
+        try{const k=await invoke('cmd_get_config',{key:`apikey.${preset.id}`})as string;if(k)keys.push({pid:preset.id,key:k})}catch{}
+      }
       if(keys.length===0){try{const k=await invoke('cmd_get_config',{key:'apikey._last'})as string;if(k)keys.push({pid:cfg.provider,key:k})}catch{}}
       console.log(`[Adapter] Config loaded: ${cfg.provider}/${cfg.chatModel}, ${keys.length} keys`);
     }catch(e){console.error('[Adapter] Config load error:',e)}
@@ -136,40 +133,30 @@ async function saveCfg(){
     await invoke!('cmd_set_config',{key:'chatModel',value:cfg.chatModel});
     await invoke!('cmd_set_config',{key:'baseURL',value:cfg.baseURL});
 
-    // Also sync the full provider preset to ~/.bytepilot/settings.json
-    const pr = PRESETS[cfg.provider];
-    if (pr) {
-      const apiKey = keys.find(k => k.pid === cfg.provider)?.key || '';
-      const env: Record<string, string> = { API_TIMEOUT_MS: '3000000' };
-      const isDeepSeek = pr.url.includes('deepseek.com');
-      const isGoogle = pr.url.includes('generativelanguage.googleapis.com');
-      if (isGoogle) {
-        env['GOOGLE_API_KEY'] = apiKey;
-      } else {
-        // Anthropic-compat and OpenAI-compat both use these env vars
-        if (!isDeepSeek) {
-          env['ANTHROPIC_BASE_URL'] = pr.url;
-          env['ANTHROPIC_MODEL'] = cfg.chatModel;
-          env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = cfg.chatModel;
-          env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = cfg.completionModel || cfg.chatModel;
-          env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = cfg.chatModel;
-          env['ANTHROPIC_AUTH_TOKEN'] = apiKey;
-        }
-        env['OPENAI_BASE_URL'] = pr.url;
-        env['OPENAI_API_KEY'] = apiKey;
-      }
-      await invoke!('cmd_sync_provider', {
-        provider: pr.id,
-        providerName: pr.name,
-        apiFormat: isGoogle ? 'google' : (pr.id === 'anthropic' && !pr.url.includes('deepseek.com') ? 'anthropic' : 'openai_compat'),
-        baseUrl: pr.url,
-        chatModel: cfg.chatModel,
-        completionModel: cfg.completionModel || cfg.chatModel,
-        env,
-      });
-    }
+    // Build settings using the same logic as the VS Code extension (from @bytepilot/core)
+    const preset = getProviderPreset(cfg.provider);
+    const apiKey = keys.find(k => k.pid === cfg.provider)?.key || '';
+    const baseUrl = cfg.baseURL || preset?.baseURL || '';
+    const apiFormat = detectApiFormat(cfg.provider, baseUrl);
+    const env = generateEnvBlock(
+      cfg.provider,
+      baseUrl,
+      apiKey,
+      cfg.chatModel,
+      cfg.completionModel || cfg.chatModel,
+    );
 
-    console.log('[Adapter] Config saved:',cfg.provider,cfg.chatModel);
+    await invoke!('cmd_sync_provider', {
+      provider: cfg.provider,
+      providerName: preset?.name || cfg.provider,
+      apiFormat,
+      baseUrl,
+      chatModel: cfg.chatModel,
+      completionModel: cfg.completionModel || cfg.chatModel,
+      env,
+    });
+
+    console.log('[Adapter] Config saved:',cfg.provider,cfg.chatModel,apiFormat);
   }catch(e){console.error('[Adapter] Save error:',e)}
 }
 
@@ -218,12 +205,13 @@ export const tauriAdapter:IPlatformAdapter={
     console.log('[Adapter]',msg.type);
     switch(msg.type){
       case'config.get':if(inited)sendCfg();break; // Only respond AFTER initTauri loaded config
-      case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=PRESETS[p.provider];cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.model||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.url||cfg.baseURL)}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;cfg.displayProvider=cfg.provider+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
+      case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=getProviderPreset(p.provider);cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.defaultChatModel||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.baseURL||cfg.baseURL)}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;const displayName=getProviderPreset(cfg.provider)?.name||cfg.provider;cfg.displayProvider=displayName+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
       case'config.setKey':{const pk=(msg as any).payload||{};const ex=keys.find(k=>k.pid===pk.providerId);if(ex)ex.key=pk.apiKey;else keys.push({pid:pk.providerId,key:pk.apiKey});saveKey(pk.providerId,pk.apiKey);break;}
       case'models.fetch':(async()=>{const k=keys.find(x=>x.pid===cfg.provider)?.key||'';try{const r=await fetch(`${cfg.baseURL.replace(/\/+$/,'')}/models`,{headers:k?{Authorization:`Bearer ${k}`}:{},signal:AbortSignal.timeout(10000)});if(r.ok){const d=await r.json()as any;const list=(d.data||d.models||[]).map((m:any)=>({id:m.id||m.name?.replace('models/','')||'',name:m.name||m.id||''})).filter((m:any)=>m.id);if(h)h({type:'models.list',payload:{models:list,sourceUrl:cfg.baseURL}})}}catch{}})();break;
       case'config.scan':scanConfigs();break;
-      case'config.import':scanConfigs();break; // same as scan — find and send config.found
-      case'config.importSpecific':{const sp=(msg as any).payload?.sourcePath||'';tryImportPath(sp);break;}
+      case'config.import':pickConfigFile();break;
+      case'config.importSpecific':importFromPayload((msg as any).payload);break;
+      case'config.manualSetup':enterManualMode();break;
       case'session.list':listChatSessions();break;
       case'session.create':{const id=`s-${Date.now()}`;sessionId=id;hist=[];saveChat();sessions.unshift({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
       case'session.switch':{const sid=(msg as any).payload?.sessionId;if(sid){sessionId=sid;hist=[];loadChat();}break;}
@@ -253,15 +241,47 @@ function sendCfg(){if(h)h({type:'config.state',payload:{...cfg}})}
 
 // ── Config import helpers ─────────────────────────────────────────────
 
+async function readHomeFile(relativePath: string): Promise<string | null> {
+  if (!invoke) return null;
+  try { return await invoke('cmd_read_home_file', { relativePath }) as string; }
+  catch { return null; }
+}
+
+async function homeFileExists(relativePath: string): Promise<boolean> {
+  if (!invoke) return false;
+  try { return await invoke('cmd_home_file_exists', { relativePath }) as boolean; }
+  catch { return false; }
+}
+
 async function scanConfigs() {
   if (!h) return;
   const found: Array<{ source: string; sourcePath: string; provider: string; chatModel?: string; baseURL?: string; hasApiKey: boolean }> = [];
 
-  // Check ~/.bytepilot/settings.json (own config)
   if (invoke) {
+    // Scan known config locations using shared paths from @bytepilot/core
+    for (const relPath of KNOWN_CONFIG_PATHS) {
+      if (await homeFileExists(relPath)) {
+        const content = await readHomeFile(relPath);
+        if (content) {
+          const parsed = parseClaudeConfig(content);
+          if (parsed) {
+            found.push({
+              source: parsed.source,
+              sourcePath: relPath,
+              provider: parsed.provider,
+              chatModel: parsed.chatModel,
+              baseURL: parsed.baseURL,
+              hasApiKey: !!parsed.apiKey,
+            });
+          }
+        }
+      }
+    }
+
+    // Also check existing BytePilot config
     try {
       const prov = await invoke('cmd_get_config', { key: 'provider' }) as string;
-      if (prov) {
+      if (prov && !found.some(f => f.source === 'BytePilot (saved)')) {
         const chatModel = await invoke('cmd_get_config', { key: 'chatModel' }) as string;
         const baseURL = await invoke('cmd_get_config', { key: 'baseURL' }) as string;
         const key = keys.find(k => k.pid === prov)?.key;
@@ -280,20 +300,91 @@ async function scanConfigs() {
   h({ type: 'config.found', payload: { configs: found } });
 }
 
+async function importFromPayload(payload: { provider?: string; chatModel?: string; baseURL?: string; apiKey?: string; sourcePath?: string }) {
+  if (!h) return;
+  if (payload.provider) {
+    cfg.provider = payload.provider;
+    cfg.chatModel = stripAnsi(payload.chatModel || '');
+    cfg.baseURL = payload.baseURL || '';
+
+    // Re-read the source file to extract the actual API key
+    const srcPath = payload.sourcePath || '';
+    if (srcPath) {
+      let content: string | null = null;
+      try {
+        if (srcPath.startsWith('.') || srcPath.startsWith('~')) {
+          content = await readHomeFile(srcPath.replace(/^~\//, ''));
+        } else {
+          content = await invoke!('cmd_read_absolute_file', { path: srcPath }) as string;
+        }
+      } catch { /* ignore */ }
+      if (content) {
+        const parsed = parseClaudeConfig(content);
+        if (parsed) {
+          cfg.provider = parsed.provider;
+          cfg.chatModel = stripAnsi(parsed.chatModel || cfg.chatModel);
+          cfg.baseURL = parsed.baseURL || cfg.baseURL;
+          // Store API key so saveCfg() can include it in env block
+          if (parsed.apiKey) {
+            const existing = keys.find(k => k.pid === cfg.provider);
+            if (existing) existing.key = parsed.apiKey;
+            else keys.push({ pid: cfg.provider, key: parsed.apiKey });
+          }
+        }
+      }
+    }
+
+    cfg.initialized = true;
+    const preset = getProviderPreset(cfg.provider);
+    cfg.displayProvider = preset?.name || cfg.provider;
+    saveCfg();
+    sendCfg();
+    listChatSessions();
+  }
+}
+
 async function tryImportPath(sourcePath: string) {
   if (!h || !invoke) return;
-  try {
-    const prov = await invoke('cmd_get_config', { key: 'provider' }) as string;
-    if (prov) {
-      cfg.provider = prov;
-      cfg.chatModel = (await invoke('cmd_get_config', { key: 'chatModel' }) as string) || cfg.chatModel;
-      cfg.baseURL = (await invoke('cmd_get_config', { key: 'baseURL' }) as string) || cfg.baseURL;
-      cfg.initialized = true;
-      cfg.displayProvider = prov + ' (Desktop)';
-      saveCfg();
-      sendCfg();
+  let content: string | null = null;
+  try { content = await invoke('cmd_read_absolute_file', { path: sourcePath }) as string; }
+  catch { return; }
+  if (!content) return;
+
+  const parsed = parseClaudeConfig(content);
+  if (parsed) {
+    cfg.provider = parsed.provider;
+    cfg.chatModel = parsed.chatModel || cfg.chatModel;
+    cfg.baseURL = parsed.baseURL || cfg.baseURL;
+    // Store API key so saveCfg() can include it in env block
+    if (parsed.apiKey) {
+      const existing = keys.find(k => k.pid === cfg.provider);
+      if (existing) existing.key = parsed.apiKey;
+      else keys.push({ pid: cfg.provider, key: parsed.apiKey });
     }
-  } catch (e) { console.error('[Adapter] importSpecific failed:', e); }
+    cfg.initialized = true;
+    const preset = getProviderPreset(cfg.provider);
+    cfg.displayProvider = preset?.name || cfg.provider;
+    saveCfg();
+    sendCfg();
+  }
+}
+
+/** Skip the setup wizard and enter chat view with unconfigured state. */
+function enterManualMode() {
+  if (!h) return;
+  cfg.initialized = true;
+  sendCfg();
+}
+
+async function pickConfigFile() {
+  if (!h || !invoke) return;
+  try {
+    const selected = await invoke('cmd_pick_file') as string | null;
+    if (selected) {
+      await tryImportPath(selected);
+      await scanConfigs();
+    }
+  } catch (e) { console.error('[Adapter] pickConfigFile failed:', e); }
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────

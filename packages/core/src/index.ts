@@ -44,6 +44,8 @@ export {
   resolveProviderConfig,
   buildProviderEnv,
 } from './config/provider-presets';
+export { parseClaudeConfig, stripAnsi, KNOWN_CONFIG_PATHS } from './config/importer';
+export type { ParsedConfig } from './config/importer';
 export {
   buildSettingsFromPreset,
   generateEnvBlock,

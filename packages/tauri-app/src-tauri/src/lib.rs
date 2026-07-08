@@ -9,6 +9,7 @@ pub fn run() {
         .manage(WorkspaceState::new())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             // File system
             cmd_read_file,
@@ -20,6 +21,9 @@ pub fn run() {
             cmd_create_dir,
             cmd_resolve_path,
             cmd_is_within_workspace,
+            cmd_read_home_file,
+            cmd_home_file_exists,
+            cmd_read_absolute_file,
             // Config
             cmd_get_config,
             cmd_set_config,
@@ -46,6 +50,7 @@ pub fn run() {
             cmd_list_dir_workspace,
             cmd_search_content,
             cmd_pick_folder,
+            cmd_pick_file,
             // Chat persistence
             cmd_save_chat,
             cmd_load_chat,

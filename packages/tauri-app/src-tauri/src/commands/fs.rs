@@ -159,3 +159,38 @@ pub fn cmd_resolve_path(state: State<WorkspaceState>, relative: String) -> Strin
 pub fn cmd_is_within_workspace(state: State<WorkspaceState>, absolute: String) -> bool {
     check_within_workspace(&state, &absolute, "path").is_ok()
 }
+
+/// Read a file from a path relative to the home directory (e.g. `.claude/settings.json`).
+#[tauri::command]
+pub fn cmd_read_home_file(relative_path: String) -> Result<String, String> {
+    let home = dirs_next()
+        .ok_or_else(|| "Cannot determine home directory".to_string())?;
+    let full = home.join(&relative_path);
+    std::fs::read_to_string(&full).map_err(|e| format!("{}", e))
+}
+
+/// Check if a file exists at a path relative to the home directory.
+#[tauri::command]
+pub fn cmd_home_file_exists(relative_path: String) -> Result<bool, String> {
+    let home = dirs_next()
+        .ok_or_else(|| "Cannot determine home directory".to_string())?;
+    let full = home.join(&relative_path);
+    Ok(full.exists())
+}
+
+/// Read a file at an absolute path (used for file-picker-selected configs).
+#[tauri::command]
+pub fn cmd_read_absolute_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("{}", e))
+}
+
+fn dirs_next() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var("USERPROFILE").ok().map(std::path::PathBuf::from)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var("HOME").ok().map(std::path::PathBuf::from)
+    }
+}
