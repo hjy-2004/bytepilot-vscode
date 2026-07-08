@@ -7,11 +7,13 @@ import type { ChatMessage } from '../state/chat-store';
 
 /** Detect directory tree structures and wrap them in markdown code blocks. */
 function preprocessTreeBlocks(content: string): string {
-  // Step 1: Split tree entries that are on the same line
-  // AI sometimes outputs: "├── a └── b" (one line, no newlines between entries)
-  // Normalize to: "├── a\n└── b"
-  const treeConnector = /(\S)\s{2,}([├└])/g;
-  content = content.replace(treeConnector, '$1\n$2');
+  // Step 1: Split same-line tree entries into proper lines.
+  // AI sometimes outputs entire trees without newlines, e.g.:
+  // "dir/ ├── sub/ │ └── file └── other"
+  // We insert \n before tree branch chars (├└) and vertical connectors (│)
+  // when they follow a non-tree character.
+  content = content.replace(/([^├└│\n])\s+([├└])/g, '$1\n$2');
+  content = content.replace(/([^├└│\n])\s+(│)/g, '$1\n$2');
 
   // Step 2: Detect lines with box-drawing chars and wrap in code fences
   const lines = content.split('\n');
