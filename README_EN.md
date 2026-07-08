@@ -22,11 +22,13 @@ Cursor-like AI coding assistant supporting both **VS Code extension** and **Taur
 - **Tool System** — 8 built-in tools: read / write / edit / search / list / command / diagnostics / diff
 - **Multi-Provider** — 60+ provider presets: Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama, plus Kimi / Zhipu / MiniMax / StepFun / Volcano / OpenRouter / SiliconFlow and more
 - **Model Fetching** — Click 🔄 to fetch live model lists from provider APIs
+- **Config Import** — Auto-scans for Claude Code, Cursor configs on first launch — one-click import of provider, model, and API key
 - **Per-Provider API Key** — API keys stored in `~/.bytepilot/settings.json` for easy manual editing and cross-tool sharing
 - **Shared Config** — VS Code extension and desktop app share `~/.bytepilot/settings.json` — configure once, available everywhere
 - **Empty by Default** — No pre-selected provider or model on first launch; the user must explicitly configure before the config file is populated
 - **Keyword Search** — BM25-based code search engine (not semantic/embedding search)
 - **CJK Token Counting** — CJK-aware token estimation (~1.5 chars/token for Chinese/Japanese/Korean, ~4 for ASCII)
+- **Theme Customization** — Desktop app supports custom themes with light/dark presets and 50+ adjustable color variables
 - **Structured Logging** — File-based logging on desktop (`%APPDATA%/BytePilot/logs/`)
 - **Cross-Platform** — 70%+ code shared between VS Code plugin and Tauri desktop app
 - **Security** — Workspace boundary checks (canonicalized to block `..` traversal, unified across both platforms), dangerous-command interception on both platforms, shell timeout process kill, and consent-gated execution of `apiKeyHelper` during config import
@@ -83,7 +85,7 @@ extension_plugin/
 │   │   ├── tools/                 # registry, diff-file, definitions
 │   │   ├── session/               # JSONL persistence
 │   │   ├── search/                # BM25 keyword search
-│   │   ├── config/                # 60+ provider presets
+│   │   ├── config/                # 60+ provider presets + config import parser
 │   │   ├── types/                 # IPC, AI, providers, platform interfaces
 │   │   └── platform/              # ILogger, IFileSystem, IConfigStore, ...
 │   │
@@ -120,6 +122,16 @@ extension_plugin/
 | UI | React 18 + Zustand + react-markdown, CSS semantic tokens |
 | Build | Turborepo + esbuild (ext) + Vite (webview) + Cargo (desktop) |
 | CI/CD | GitHub Actions (typecheck, lint, 3-platform desktop, VS Code Marketplace) |
+
+## Theme Settings (Desktop)
+
+The desktop app includes a built-in theme editor — click the gear icon in the sidebar:
+
+- **Presets**: Light and Dark modes, switch instantly
+- **Custom colors**: 50+ CSS variables across 9 categories, use the native color picker
+- **Live preview**: Changes apply immediately, no restart needed
+- **Reset**: One-click restore to default colors
+- **Persistence**: Theme settings saved to localStorage
 
 ## Desktop Logging
 

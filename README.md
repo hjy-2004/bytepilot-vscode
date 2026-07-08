@@ -23,6 +23,7 @@
 - **Multi-Provider** — 60+ 供应商预设，支持 Anthropic / OpenAI / DeepSeek / Google Gemini / Azure OpenAI / Ollama / Kimi / 智谱 / MiniMax / 阶跃星辰 / 火山方舟 / OpenRouter / SiliconFlow 等
 - **Provider Categories** — 供应商按 5 大分类展示（官方 / 国产官方 / 聚合商 / 第三方 / 云服务商）
 - **Model Fetching** — 点击 🔄 一键从供应商 API 拉取实时模型列表
+- **Config Import** — 首次启动自动扫描 Claude Code、Cursor 等已知配置文件，一键导入 Provider / Model / API Key
 - **Per-Provider API Key** — 每个供应商独立存储 API key，写入 `~/.bytepilot/settings.json`，方便手动编辑和跨工具共享
 - **Shared Config** — 插件和桌面端共享 `~/.bytepilot/settings.json`，一端配置另一端自动沿用
 - **Empty by Default** — 首次启动不预设供应商/模型，用户自行选择后才会写入配置文件
@@ -33,6 +34,7 @@
 - **CJK Token Counting** — 中/日/韩文字符感知的 token 估算（~1.5 chars/token vs ASCII ~4）
 - **Project Rules** — `.bytepilotrules` 自动注入 AI system prompt
 - **Auto Config** — 首次启动自动创建 `~/.bytepilot/settings.json` 空占位文件，可从 `.claude/settings.json` 一键导入配置
+- **Theme Customization** — 桌面端支持自定义主题配色，预设浅色/深色模式，可调整 50+ 颜色变量
 - **Multi-Session** — JSONL 持久化，创建/切换/删除会话
 - **Structured Logging** — 统一日志（桌面端支持文件日志 `%APPDATA%/BytePilot/logs/`）
 - **Cross-Platform** — 70%+ 代码在 VS Code 和桌面端之间共享
@@ -91,7 +93,7 @@ extension_plugin/
 │   │   ├── tools/                 # registry, diff-file, definitions
 │   │   ├── session/               # JSONL 持久化
 │   │   ├── search/                # BM25 语义搜索
-│   │   ├── config/                # 60+ 供应商预设
+│   │   ├── config/                # 60+ 供应商预设 + 配置导入解析
 │   │   ├── types/                 # IPC, AI, providers, platform 接口
 │   │   └── platform/              # ILogger, IFileSystem, IConfigStore, ...
 │   │
@@ -129,6 +131,16 @@ extension_plugin/
 | UI | React 18 + Zustand + react-markdown, CSS 语义令牌 |
 | 构建 | Turborepo + esbuild (插件) + Vite (WebView) + Cargo (桌面) |
 | CI/CD | GitHub Actions (typecheck, lint, 三平台桌面构建, VS Code Marketplace 发布) |
+
+## 主题设置（桌面端）
+
+桌面端支持自定义主题配色，点击侧边栏齿轮图标进入设置页面：
+
+- **预设模式**：浅色 / 深色两种预设，一键切换
+- **自定义配色**：9 个分类共 50+ 颜色变量，使用取色器自由调整
+- **实时预览**：修改即时生效，无需重启
+- **重置恢复**：一键恢复默认配色
+- **持久化**：配色方案保存在浏览器 localStorage 中
 
 ## 桌面端日志
 
