@@ -7,13 +7,18 @@ import type { ChatMessage } from '../state/chat-store';
 
 /** Detect directory tree structures and wrap them in markdown code blocks. */
 function preprocessTreeBlocks(content: string): string {
+  // Step 1: Split tree entries that are on the same line
+  // AI sometimes outputs: "├── a └── b" (one line, no newlines between entries)
+  // Normalize to: "├── a\n└── b"
+  const treeConnector = /(\S)\s{2,}([├└])/g;
+  content = content.replace(treeConnector, '$1\n$2');
+
+  // Step 2: Detect lines with box-drawing chars and wrap in code fences
   const lines = content.split('\n');
   const result: string[] = [];
   let inTree = false;
   let treeLines: string[] = [];
-
-  // Box-drawing characters commonly used in directory trees
-  const treeChars = /[\u2500-\u257F\u251C\u2514\u2502\u252C]/;
+  const treeChars = /[\u2500-\u257F]/;
 
   for (const line of lines) {
     const isTreeLine = treeChars.test(line);
@@ -25,7 +30,6 @@ function preprocessTreeBlocks(content: string): string {
       treeLines.push(line);
     } else {
       if (inTree) {
-        // End of tree block — wrap in code fence
         if (treeLines.length > 0) {
           result.push('```');
           result.push(...treeLines);
@@ -37,7 +41,6 @@ function preprocessTreeBlocks(content: string): string {
       result.push(line);
     }
   }
-  // Flush remaining tree at end of content
   if (inTree && treeLines.length > 0) {
     result.push('```');
     result.push(...treeLines);
