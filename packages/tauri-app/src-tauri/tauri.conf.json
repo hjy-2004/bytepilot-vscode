@@ -4,7 +4,7 @@
   "version": "0.6.5",
   "identifier": "com.bytepilot.app",
   "build": {
-    "frontendDist": "../../../webview-ui/dist",
+    "frontendDist": "../../../webview-ui/dist-desktop",
     "beforeDevCommand": "cd ../../webview-ui && npm run build:desktop",
     "beforeBuildCommand": "cd ../../webview-ui && npm run build:desktop"
   },

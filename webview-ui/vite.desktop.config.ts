@@ -20,7 +20,8 @@ export default defineConfig({
     ],
   },
   build: {
-    outDir: 'dist',
+    outDir: 'dist-desktop',
+    emptyOutDir: true,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.desktop.html'),
       external: ['@tauri-apps/api', '@tauri-apps/api/core', '@tauri-apps/api/event'],

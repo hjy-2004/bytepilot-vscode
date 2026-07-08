@@ -99,6 +99,12 @@ pub fn cmd_get_config(
         "baseURL" => Ok(settings.base_url.clone()),
         "chatModel" => Ok(settings.chat_model.clone()),
         "completionModel" => Ok(settings.completion_model.clone()),
+        "apiKey" => Ok(settings.env.get("OPENAI_API_KEY")
+            .or_else(|| settings.env.get("ANTHROPIC_AUTH_TOKEN"))
+            .or_else(|| settings.env.get("ANTHROPIC_API_KEY"))
+            .or_else(|| settings.env.get("GOOGLE_API_KEY"))
+            .cloned()
+            .unwrap_or_default()),
         _ => Ok(String::new()),
     }
 }

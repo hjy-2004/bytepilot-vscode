@@ -7,7 +7,7 @@ import type { ExtensionMessage, WebViewMessage } from '../types/ipc';
 import { runAgentLoop, type AgentCallbacks } from '@bytepilot/core/ai/agent-loop';
 import type { Message } from '@bytepilot/core/ai/message-types';
 import { generateEnvBlock } from '@bytepilot/core/config/settings-manager';
-import { getProviderPreset, detectApiFormat, getAllProviders } from '@bytepilot/core/config/provider-presets';
+import { getProviderPreset, detectApiFormat } from '@bytepilot/core/config/provider-presets';
 import { parseClaudeConfig, stripAnsi, KNOWN_CONFIG_PATHS, resolveImportBaseURL } from '@bytepilot/core/config/importer';
 
 // ── Tool definitions ─────────────────────────────────────────────────
@@ -86,7 +86,14 @@ async function listChatSessions(){
 }
 
 function sysPrompt():string{
-  let p=`You are BytePilot, a desktop AI coding assistant. Use tools to read/write files and run commands. Be concise.\n\n## Workspace`;
+  let p=`You are BytePilot, a desktop AI coding assistant. Use tools to read/write files and run commands. Be concise.
+
+## Formatting
+- Directory trees, file listings, and project structures MUST be wrapped in code blocks (\`\`\`) for proper rendering.
+- Inline code (file paths, function names) should use backtick formatting.
+- Keep responses in the same language as the user's query.
+
+## Workspace`;
   if(wsRoot){p+=`\nPath: ${wsRoot}`;if(projFiles.length>0)p+=`\n\n${projFiles.slice(0,80).map(f=>`- ${f.path}${f.is_dir?'/':''}`).join('\n')}`;if(rules)p+=`\n\n## Rules\n${rules}`}
   else p+='\n(No workspace open.)';
   return p;
@@ -114,10 +121,9 @@ async function initTauri(){
         cfg.displayProvider=displayName+' (Desktop)';
         cfg.initialized=true;
       }
-      // Load API keys — try all known provider ids from core presets
-      for(const preset of getAllProviders()){
-        try{const k=await invoke('cmd_get_config',{key:`apikey.${preset.id}`})as string;if(k)keys.push({pid:preset.id,key:k})}catch{}
-      }
+      // Load API key from settings.json env block (same source as VS Code extension)
+      if(cfg.provider){try{const k=await invoke('cmd_get_config',{key:'apiKey'})as string;if(k)keys.push({pid:cfg.provider,key:k})}catch{}}
+      // Also try the generic "apikey._last" key for backward compat
       if(keys.length===0){try{const k=await invoke('cmd_get_config',{key:'apikey._last'})as string;if(k)keys.push({pid:cfg.provider,key:k})}catch{}}
       console.log(`[Adapter] Config loaded: ${cfg.provider}/${cfg.chatModel}, ${keys.length} keys`);
     }catch(e){console.error('[Adapter] Config load error:',e)}
@@ -158,11 +164,6 @@ async function saveCfg(){
 
     console.log('[Adapter] Config saved:',cfg.provider,cfg.chatModel,apiFormat);
   }catch(e){console.error('[Adapter] Save error:',e)}
-}
-
-async function saveKey(pid:string,key:string){
-  if(!await ensureInvoke())return;
-  try{await invoke!('cmd_set_config',{key:`apikey.${pid}`,value:key});await invoke!('cmd_set_config',{key:'apikey._last',value:key});console.log('[Adapter] Key saved for',pid)}catch(e){console.error('[Adapter] Key save error:',e)}
 }
 
 // ── Workspace ────────────────────────────────────────────────────────
@@ -206,7 +207,7 @@ export const tauriAdapter:IPlatformAdapter={
     switch(msg.type){
       case'config.get':if(inited)sendCfg();break; // Only respond AFTER initTauri loaded config
       case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=getProviderPreset(p.provider);cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.defaultChatModel||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.baseURL||cfg.baseURL)}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;const displayName=getProviderPreset(cfg.provider)?.name||cfg.provider;cfg.displayProvider=displayName+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
-      case'config.setKey':{const pk=(msg as any).payload||{};const ex=keys.find(k=>k.pid===pk.providerId);if(ex)ex.key=pk.apiKey;else keys.push({pid:pk.providerId,key:pk.apiKey});saveKey(pk.providerId,pk.apiKey);break;}
+      case'config.setKey':{const pk=(msg as any).payload||{};const ex=keys.find(k=>k.pid===pk.providerId);if(ex)ex.key=pk.apiKey;else keys.push({pid:pk.providerId,key:pk.apiKey});saveCfg();break;}
       case'models.fetch':(async()=>{const k=keys.find(x=>x.pid===cfg.provider)?.key||'';try{const r=await fetch(`${cfg.baseURL.replace(/\/+$/,'')}/models`,{headers:k?{Authorization:`Bearer ${k}`}:{},signal:AbortSignal.timeout(10000)});if(r.ok){const d=await r.json()as any;const list=(d.data||d.models||[]).map((m:any)=>({id:m.id||m.name?.replace('models/','')||'',name:m.name||m.id||''})).filter((m:any)=>m.id);if(h)h({type:'models.list',payload:{models:list,sourceUrl:cfg.baseURL}})}}catch{}})();break;
       case'config.scan':scanConfigs();break;
       case'config.import':pickConfigFile();break;
