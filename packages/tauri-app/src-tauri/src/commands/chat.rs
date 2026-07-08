@@ -1,12 +1,14 @@
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
-use tauri::State;
-use crate::commands::workspace::WorkspaceState;
 
-fn chat_dir(state: &WorkspaceState) -> PathBuf {
-    let root = state.root.lock().unwrap_or_else(|e| e.into_inner());
-    let dir = root.join(".bytepilot").join("sessions");
+/// User-wide session storage directory: ~/.bytepilot/sessions/
+/// Avoids writing into the workspace so Tauri's dev watcher doesn't restart the app.
+fn chat_dir() -> PathBuf {
+    let base = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| ".".into());
+    let dir = PathBuf::from(&base).join(".bytepilot").join("sessions");
     fs::create_dir_all(&dir).ok();
     dir
 }
@@ -28,11 +30,10 @@ pub struct SessionData {
 
 #[tauri::command]
 pub fn cmd_save_chat(
-    state: State<WorkspaceState>,
     session_id: String,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
-    let dir = chat_dir(&state);
+    let dir = chat_dir();
     let path = dir.join(format!("{}.json", session_id));
     let data = SessionData { messages };
     let json = serde_json::to_string_pretty(&data).map_err(|e| format!("{}", e))?;
@@ -41,10 +42,9 @@ pub fn cmd_save_chat(
 
 #[tauri::command]
 pub fn cmd_load_chat(
-    state: State<WorkspaceState>,
     session_id: String,
 ) -> Result<SessionData, String> {
-    let dir = chat_dir(&state);
+    let dir = chat_dir();
     let path = dir.join(format!("{}.json", session_id));
     if path.exists() {
         let content = fs::read_to_string(&path).map_err(|e| format!("{}", e))?;
@@ -55,10 +55,8 @@ pub fn cmd_load_chat(
 }
 
 #[tauri::command]
-pub fn cmd_list_sessions(
-    state: State<WorkspaceState>,
-) -> Result<Vec<String>, String> {
-    let dir = chat_dir(&state);
+pub fn cmd_list_sessions() -> Result<Vec<String>, String> {
+    let dir = chat_dir();
     let mut ids = Vec::new();
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
@@ -73,10 +71,9 @@ pub fn cmd_list_sessions(
 
 #[tauri::command]
 pub fn cmd_delete_session(
-    state: State<WorkspaceState>,
     session_id: String,
 ) -> Result<(), String> {
-    let dir = chat_dir(&state);
+    let dir = chat_dir();
     let path = dir.join(format!("{}.json", session_id));
     if path.exists() {
         fs::remove_file(&path).map_err(|e| format!("{}", e))
