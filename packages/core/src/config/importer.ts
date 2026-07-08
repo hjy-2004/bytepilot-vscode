@@ -4,6 +4,10 @@
  * accepts file content as a string, returns parsed config or null.
  */
 
+import { getProviderPreset } from './provider-presets';
+
+// ── Types ────────────────────────────────────────────────────────────────
+
 export interface ParsedConfig {
   provider: string;
   chatModel?: string;
@@ -83,6 +87,37 @@ export function stripAnsi(s: string): string {
     .replace(/\[[0-9;]*[a-zA-Z]/g, '')  // Broken/malformed CSI without ESC prefix
     .replace(/\]$/, '')  // Trailing bracket
     .trim();
+}
+
+/**
+ * Normalize an imported base URL from Claude Code config.
+ *
+ * Claude Code uses Anthropic protocol endpoints (e.g. /anthropic suffix), but
+ * BytePilot may route the same provider through OpenAI-compatible protocol for
+ * better tool calling. Replace Anthropic-protocol URLs with the provider's
+ * standard base URL when appropriate.
+ */
+export function resolveImportBaseURL(provider: string, baseURL: string): string {
+  // Anthropic-protocol path patterns
+  const anthropicPaths = [
+    '/anthropic', '/api/anthropic', '/apps/anthropic',
+    '/api/coding', '/api/claudecode', '/claudecode', '/claude',
+  ];
+  const urlLower = baseURL.toLowerCase();
+  const isAnthropicEndpoint = anthropicPaths.some(p =>
+    urlLower.endsWith(p) || urlLower.includes(p + '/')
+  );
+
+  if (!isAnthropicEndpoint) return baseURL;
+
+  // For DeepSeek, always use the OpenAI-compatible endpoint
+  if (urlLower.includes('deepseek.com')) return 'https://api.deepseek.com/v1';
+
+  // For other providers, use their preset default base URL
+  const preset = getProviderPreset(provider);
+  if (preset?.baseURL) return preset.baseURL;
+
+  return baseURL;
 }
 
 /** Known config file paths to scan (relative to home directory). */

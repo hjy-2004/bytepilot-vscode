@@ -5,7 +5,7 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import { logInfo, logError } from '../utils/logger';
 import type { ProviderId } from '../types/ai';
-import { parseClaudeConfig as parseClaudeConfigCore } from '@bytepilot/core/config/importer';
+import { parseClaudeConfig as parseClaudeConfigCore, resolveImportBaseURL } from '@bytepilot/core/config/importer';
 
 /**
  * Configuration importer: one-click import from other AI coding tools.
@@ -365,7 +365,8 @@ export async function applyImportedConfig(
     await config.update('chatModel', imported.chatModel, vscode.ConfigurationTarget.Global);
   }
   if (imported.baseURL) {
-    await config.update('baseURL', imported.baseURL, vscode.ConfigurationTarget.Global);
+    const normalizedURL = resolveImportBaseURL(imported.provider, imported.baseURL);
+    await config.update('baseURL', normalizedURL, vscode.ConfigurationTarget.Global);
   }
 
   logInfo(`Config imported from ${imported.source}: ${imported.sourcePath}`);

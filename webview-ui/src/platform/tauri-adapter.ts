@@ -8,7 +8,7 @@ import { runAgentLoop, type AgentCallbacks } from '@bytepilot/core/ai/agent-loop
 import type { Message } from '@bytepilot/core/ai/message-types';
 import { generateEnvBlock } from '@bytepilot/core/config/settings-manager';
 import { getProviderPreset, detectApiFormat, getAllProviders } from '@bytepilot/core/config/provider-presets';
-import { parseClaudeConfig, stripAnsi, KNOWN_CONFIG_PATHS } from '@bytepilot/core/config/importer';
+import { parseClaudeConfig, stripAnsi, KNOWN_CONFIG_PATHS, resolveImportBaseURL } from '@bytepilot/core/config/importer';
 
 // ── Tool definitions ─────────────────────────────────────────────────
 
@@ -305,7 +305,7 @@ async function importFromPayload(payload: { provider?: string; chatModel?: strin
   if (payload.provider) {
     cfg.provider = payload.provider;
     cfg.chatModel = stripAnsi(payload.chatModel || '');
-    cfg.baseURL = payload.baseURL || '';
+    cfg.baseURL = resolveImportBaseURL(payload.provider, payload.baseURL || '');
 
     // Re-read the source file to extract the actual API key
     const srcPath = payload.sourcePath || '';
@@ -323,7 +323,7 @@ async function importFromPayload(payload: { provider?: string; chatModel?: strin
         if (parsed) {
           cfg.provider = parsed.provider;
           cfg.chatModel = stripAnsi(parsed.chatModel || cfg.chatModel);
-          cfg.baseURL = parsed.baseURL || cfg.baseURL;
+          cfg.baseURL = resolveImportBaseURL(cfg.provider, parsed.baseURL || cfg.baseURL);
           // Store API key so saveCfg() can include it in env block
           if (parsed.apiKey) {
             const existing = keys.find(k => k.pid === cfg.provider);
@@ -354,7 +354,7 @@ async function tryImportPath(sourcePath: string) {
   if (parsed) {
     cfg.provider = parsed.provider;
     cfg.chatModel = parsed.chatModel || cfg.chatModel;
-    cfg.baseURL = parsed.baseURL || cfg.baseURL;
+    cfg.baseURL = resolveImportBaseURL(cfg.provider, parsed.baseURL || cfg.baseURL);
     // Store API key so saveCfg() can include it in env block
     if (parsed.apiKey) {
       const existing = keys.find(k => k.pid === cfg.provider);
