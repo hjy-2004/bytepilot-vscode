@@ -32,6 +32,9 @@ async function fetchWithRetry(
     let retryAfterMs: number | undefined;
     try {
       const res = await fetch(url, init);
+      if (!res.ok && attempt === 0) {
+        console.error(`[api-client] HTTP ${res.status} ${res.statusText} — ${url}`);
+      }
       if (res.ok || !RETRYABLE_STATUSES.has(res.status) || attempt === retries) {
         return res;
       }
