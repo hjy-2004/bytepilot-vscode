@@ -86,14 +86,7 @@ async function listChatSessions(){
 }
 
 function sysPrompt():string{
-  let p=`You are BytePilot, a desktop AI coding assistant. Use tools to read/write files and run commands. Be concise.
-
-## Formatting
-- Directory trees, file listings, and project structures MUST be wrapped in code blocks (\`\`\`) for proper rendering.
-- Inline code (file paths, function names) should use backtick formatting.
-- Keep responses in the same language as the user's query.
-
-## Workspace`;
+  let p=`You are BytePilot, a desktop AI coding assistant. Use tools to read/write files and run commands. Be concise.\n\n## Workspace`;
   if(wsRoot){p+=`\nPath: ${wsRoot}`;if(projFiles.length>0)p+=`\n\n${projFiles.slice(0,80).map(f=>`- ${f.path}${f.is_dir?'/':''}`).join('\n')}`;if(rules)p+=`\n\n## Rules\n${rules}`}
   else p+='\n(No workspace open.)';
   return p;

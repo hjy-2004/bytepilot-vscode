@@ -5,6 +5,48 @@ import { CodeBlock } from './CodeBlock';
 import { ToolCallCard } from './ToolCallCard';
 import type { ChatMessage } from '../state/chat-store';
 
+/** Detect directory tree structures and wrap them in markdown code blocks. */
+function preprocessTreeBlocks(content: string): string {
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let inTree = false;
+  let treeLines: string[] = [];
+
+  // Box-drawing characters commonly used in directory trees
+  const treeChars = /[\u2500-\u257F\u251C\u2514\u2502\u252C]/;
+
+  for (const line of lines) {
+    const isTreeLine = treeChars.test(line);
+    if (isTreeLine && !line.trim().startsWith('```')) {
+      if (!inTree) {
+        inTree = true;
+        treeLines = [];
+      }
+      treeLines.push(line);
+    } else {
+      if (inTree) {
+        // End of tree block — wrap in code fence
+        if (treeLines.length > 0) {
+          result.push('```');
+          result.push(...treeLines);
+          result.push('```');
+        }
+        inTree = false;
+        treeLines = [];
+      }
+      result.push(line);
+    }
+  }
+  // Flush remaining tree at end of content
+  if (inTree && treeLines.length > 0) {
+    result.push('```');
+    result.push(...treeLines);
+    result.push('```');
+  }
+
+  return result.join('\n');
+}
+
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
@@ -77,6 +119,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           }}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
+              children={preprocessTreeBlocks(message.content)}
               components={{
                 code({ className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');
@@ -118,9 +161,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   );
                 },
               }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            />
             {isStreaming && (
               <span style={{
                 display: 'inline-block',

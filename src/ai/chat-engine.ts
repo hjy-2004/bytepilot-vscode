@@ -38,14 +38,7 @@ __TOOLS_PLACEHOLDER__
 - Use workspace-relative paths (e.g., "src/index.ts").
 - Keep responses concise; show code over explanation.
 - When you see errors, check diagnostics first.
-- Follow the project's existing code style.
-
-## Output formatting
-- Use proper Markdown formatting in all responses.
-- Directory trees, file listings, and project structures MUST be wrapped in code blocks (\`\`\`) for proper rendering.
-- Use the format \`\`\`path/to/dir ... \`\`\` for tree structures.
-- Inline code references (file paths, function names, variable names) should use backtick formatting.
-- Keep responses in the same language as the user's query (Chinese or English).`;
+- Follow the project's existing code style.`;
 
 /**
  * Core chat engine that manages AI conversations with tool calling.
