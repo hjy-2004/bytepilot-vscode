@@ -44,6 +44,25 @@
   letter-spacing: -0.01em;
 }
 
+.desktop-sidebar-settings-btn {
+  background: transparent;
+  border: none;
+  color: var(--bytepilot-fg-secondary);
+  cursor: pointer;
+  padding: 5px 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.desktop-sidebar-settings-btn:hover {
+  opacity: 1;
+  background: var(--bytepilot-btn-secondary-bg);
+}
+
 .desktop-sidebar-new-btn {
   background: var(--bytepilot-btn-secondary-bg);
   color: var(--bytepilot-btn-secondary-fg);

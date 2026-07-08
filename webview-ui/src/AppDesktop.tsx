@@ -1,6 +1,8 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { ChatContainerDesktop } from './components/ChatContainerDesktop';
 import { SetupWizard, type FoundConfig } from './components/SetupWizard';
+import { SettingsPage } from './components/SettingsPage';
+import { loadTheme } from './theme/theme-presets';
 
 import { usePlatform, useOnMessage } from './hooks/usePlatform';
 import { useChatStore } from './state/chat-store';
@@ -31,6 +33,16 @@ const AppDesktop: React.FC = () => {
   const [fetchedModels, setFetchedModels] = useState<{ id: string; name: string }[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [workspaceRoot, setWorkspaceRoot] = useState<string>('');
+  const [view, setView] = useState<'chat' | 'settings'>('chat');
+
+  // Apply saved theme on mount
+  useEffect(() => {
+    const saved = loadTheme();
+    const root = document.documentElement;
+    for (const [name, value] of Object.entries(saved.values)) {
+      root.style.setProperty(name, value);
+    }
+  }, []);
 
   const handleExtensionMessage = useCallback((msg: ExtensionMessage) => {
     const store = useChatStore.getState();
@@ -202,7 +214,9 @@ const AppDesktop: React.FC = () => {
 
   return (
     <>
-      {!configLoaded ? (
+      {view === 'settings' ? (
+        <SettingsPage onBack={() => setView('chat')} />
+      ) : !configLoaded ? (
         <div style={{
           height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--bytepilot-fg-secondary)', fontSize: '14px',
@@ -244,6 +258,7 @@ const AppDesktop: React.FC = () => {
           onDeleteSession={handleDeleteSession}
           onPickWorkspace={() => postMessage({ type: 'workspace.pick' } as any)}
           workspaceRoot={workspaceRoot}
+          onOpenSettings={() => setView('settings')}
         />
       )}
 

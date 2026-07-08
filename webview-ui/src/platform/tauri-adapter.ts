@@ -119,7 +119,7 @@ async function initTauri(){
     try{
       const prov=await invoke('cmd_get_config',{key:'provider'}) as string;
       console.log('[Adapter] Loaded provider from disk:',prov||'(none)');
-      if(prov){cfg.provider=prov;cfg.chatModel=(await invoke('cmd_get_config',{key:'chatModel'})as string)||cfg.chatModel;cfg.baseURL=(await invoke('cmd_get_config',{key:'baseURL'})as string)||cfg.baseURL;cfg.displayProvider=prov+' (Desktop)';}
+      if(prov){cfg.provider=prov;cfg.chatModel=(await invoke('cmd_get_config',{key:'chatModel'})as string)||cfg.chatModel;cfg.baseURL=(await invoke('cmd_get_config',{key:'baseURL'})as string)||cfg.baseURL;cfg.displayProvider=prov+' (Desktop)';cfg.initialized=true;}
       for(const pid of Object.keys(PRESETS)){try{const k=await invoke('cmd_get_config',{key:`apikey.${pid}`})as string;if(k)keys.push({pid,key:k})}catch{}}
       if(keys.length===0){try{const k=await invoke('cmd_get_config',{key:'apikey._last'})as string;if(k)keys.push({pid:cfg.provider,key:k})}catch{}}
       console.log(`[Adapter] Config loaded: ${cfg.provider}/${cfg.chatModel}, ${keys.length} keys`);
@@ -221,6 +221,9 @@ export const tauriAdapter:IPlatformAdapter={
       case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=PRESETS[p.provider];cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.model||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.url||cfg.baseURL)}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;cfg.displayProvider=cfg.provider+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
       case'config.setKey':{const pk=(msg as any).payload||{};const ex=keys.find(k=>k.pid===pk.providerId);if(ex)ex.key=pk.apiKey;else keys.push({pid:pk.providerId,key:pk.apiKey});saveKey(pk.providerId,pk.apiKey);break;}
       case'models.fetch':(async()=>{const k=keys.find(x=>x.pid===cfg.provider)?.key||'';try{const r=await fetch(`${cfg.baseURL.replace(/\/+$/,'')}/models`,{headers:k?{Authorization:`Bearer ${k}`}:{},signal:AbortSignal.timeout(10000)});if(r.ok){const d=await r.json()as any;const list=(d.data||d.models||[]).map((m:any)=>({id:m.id||m.name?.replace('models/','')||'',name:m.name||m.id||''})).filter((m:any)=>m.id);if(h)h({type:'models.list',payload:{models:list,sourceUrl:cfg.baseURL}})}}catch{}})();break;
+      case'config.scan':scanConfigs();break;
+      case'config.import':scanConfigs();break; // same as scan — find and send config.found
+      case'config.importSpecific':{const sp=(msg as any).payload?.sourcePath||'';tryImportPath(sp);break;}
       case'session.list':listChatSessions();break;
       case'session.create':{const id=`s-${Date.now()}`;sessionId=id;hist=[];saveChat();sessions.unshift({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
       case'session.switch':{const sid=(msg as any).payload?.sessionId;if(sid){sessionId=sid;hist=[];loadChat();}break;}
@@ -247,6 +250,51 @@ function sendInit(dest:(m:ExtensionMessage)=>void){
   loadWS().then(()=>{if(dest===h)dest({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}})});
 }
 function sendCfg(){if(h)h({type:'config.state',payload:{...cfg}})}
+
+// ── Config import helpers ─────────────────────────────────────────────
+
+async function scanConfigs() {
+  if (!h) return;
+  const found: Array<{ source: string; sourcePath: string; provider: string; chatModel?: string; baseURL?: string; hasApiKey: boolean }> = [];
+
+  // Check ~/.bytepilot/settings.json (own config)
+  if (invoke) {
+    try {
+      const prov = await invoke('cmd_get_config', { key: 'provider' }) as string;
+      if (prov) {
+        const chatModel = await invoke('cmd_get_config', { key: 'chatModel' }) as string;
+        const baseURL = await invoke('cmd_get_config', { key: 'baseURL' }) as string;
+        const key = keys.find(k => k.pid === prov)?.key;
+        found.push({
+          source: 'BytePilot (saved)',
+          sourcePath: '~/.bytepilot/settings.json',
+          provider: prov,
+          chatModel: chatModel || undefined,
+          baseURL: baseURL || undefined,
+          hasApiKey: !!key,
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
+  h({ type: 'config.found', payload: { configs: found } });
+}
+
+async function tryImportPath(sourcePath: string) {
+  if (!h || !invoke) return;
+  try {
+    const prov = await invoke('cmd_get_config', { key: 'provider' }) as string;
+    if (prov) {
+      cfg.provider = prov;
+      cfg.chatModel = (await invoke('cmd_get_config', { key: 'chatModel' }) as string) || cfg.chatModel;
+      cfg.baseURL = (await invoke('cmd_get_config', { key: 'baseURL' }) as string) || cfg.baseURL;
+      cfg.initialized = true;
+      cfg.displayProvider = prov + ' (Desktop)';
+      saveCfg();
+      sendCfg();
+    }
+  } catch (e) { console.error('[Adapter] importSpecific failed:', e); }
+}
 
 // ── Chat ─────────────────────────────────────────────────────────────
 

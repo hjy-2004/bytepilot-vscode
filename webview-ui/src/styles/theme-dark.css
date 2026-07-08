@@ -1,0 +1,67 @@
+/**
+ * Dark theme CSS variables — for reference.
+ * The settings page applies these at runtime via JS (document.documentElement.style).
+ *
+ * This file documents the dark preset values and can be imported as a fallback
+ * in environments where JS theme application is not available.
+ */
+:root .theme-dark {
+  --bytepilot-bg-primary:             #1e1e22;
+  --bytepilot-bg-secondary:           #25252b;
+  --bytepilot-input-bg:               #2c2c33;
+  --bytepilot-code-bg:                #1a1a1f;
+  --bytepilot-border:                 #3a3a44;
+  --bytepilot-focus-border:           #7eb8d4;
+
+  --bytepilot-fg-primary:             #e0e0e4;
+  --bytepilot-fg-secondary:           #8a8a99;
+  --bytepilot-input-fg:               #e0e0e4;
+  --bytepilot-input-border:           #444451;
+
+  --bytepilot-btn-bg:                 #507a94;
+  --bytepilot-btn-fg:                 #ffffff;
+  --bytepilot-btn-hover:              #426a82;
+  --bytepilot-btn-secondary-bg:       #32323b;
+  --bytepilot-btn-secondary-fg:       #c0c0cc;
+  --bytepilot-btn-secondary-hover:    #3e3e49;
+
+  --bytepilot-badge-bg:               #32323b;
+  --bytepilot-badge-fg:               #a0a0b0;
+  --bytepilot-blockquote-border:      #7eb8d4;
+  --bytepilot-blockquote-bg:          rgba(126, 184, 212, 0.08);
+  --bytepilot-link-fg:                #7eb8d4;
+  --bytepilot-titlebar-bg:            #212126;
+
+  --bytepilot-dropdown-bg:            #2c2c33;
+  --bytepilot-dropdown-fg:            #e0e0e4;
+  --bytepilot-dropdown-border:        #3a3a44;
+
+  --bytepilot-list-active-bg:         #323840;
+  --bytepilot-list-active-fg:         #e0e0e4;
+  --bytepilot-list-hover-bg:          #2e2e36;
+
+  --bytepilot-scrollbar:              #3a3a44;
+  --bytepilot-scrollbar-hover:        #55555f;
+
+  --bytepilot-error-bg:               rgba(230, 80, 70, 0.15);
+  --bytepilot-error-fg:               #e87065;
+  --bytepilot-progress-bg:            #507a94;
+  --bytepilot-accent:                 #5eae70;
+  --bytepilot-diff-add-fg:            #5eae70;
+  --bytepilot-diff-remove-fg:         #e87065;
+  --bytepilot-diff-add-bg:            rgba(94, 174, 112, 0.15);
+  --bytepilot-diff-remove-bg:         rgba(232, 112, 101, 0.15);
+
+  --bytepilot-status-pending-fg:      #d4a840;
+  --bytepilot-status-pending-bg:      rgba(212, 168, 64, 0.12);
+  --bytepilot-status-pending-border:  #d4a840;
+  --bytepilot-status-running-fg:      #888;
+  --bytepilot-status-running-bg:      rgba(136, 136, 136, 0.08);
+  --bytepilot-status-running-border:  rgba(136, 136, 136, 0.4);
+  --bytepilot-status-done-fg:         #5eae70;
+  --bytepilot-status-done-bg:         rgba(94, 174, 112, 0.1);
+  --bytepilot-status-done-border:     rgba(94, 174, 112, 0.35);
+  --bytepilot-status-error-fg:        #e87065;
+  --bytepilot-status-error-bg:        rgba(232, 112, 101, 0.1);
+  --bytepilot-status-error-border:    rgba(232, 112, 101, 0.45);
+}

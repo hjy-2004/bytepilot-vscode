@@ -1,0 +1,241 @@
+/**
+ * Settings page styles — desktop only.
+ * Imported by main-desktop.tsx.
+ */
+
+.settings-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bytepilot-bg-primary);
+  color: var(--bytepilot-fg-primary);
+}
+
+/* ── Header ──────────────────────────────────── */
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--bytepilot-border);
+  background: var(--bytepilot-bg-secondary);
+  flex-shrink: 0;
+}
+
+.settings-back-btn {
+  background: var(--bytepilot-btn-secondary-bg);
+  color: var(--bytepilot-btn-secondary-fg);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settings-back-btn:hover {
+  background: var(--bytepilot-btn-secondary-hover);
+}
+
+.settings-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ── Preset bar ──────────────────────────────── */
+.settings-preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--bytepilot-border);
+  flex-shrink: 0;
+}
+
+.settings-preset-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.settings-preset-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--bytepilot-border);
+  border-radius: 6px;
+  background: var(--bytepilot-input-bg);
+  color: var(--bytepilot-fg-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-preset-btn:hover {
+  background: var(--bytepilot-btn-secondary-hover);
+}
+
+.settings-preset-btn.active {
+  background: var(--bytepilot-btn-bg);
+  color: var(--bytepilot-btn-fg);
+  border-color: var(--bytepilot-btn-bg);
+}
+
+.settings-preset-hint {
+  font-size: 12px;
+  color: var(--bytepilot-fg-secondary);
+}
+
+.settings-reset-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--bytepilot-error-fg);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bytepilot-error-fg);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  margin-left: auto;
+}
+
+.settings-reset-btn:hover {
+  background: var(--bytepilot-error-bg);
+}
+
+/* ── Palette (scrollable) ────────────────────── */
+.settings-palette {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+/* ── Category ────────────────────────────────── */
+.settings-category {
+  margin-bottom: 8px;
+  border: 1px solid var(--bytepilot-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.settings-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bytepilot-bg-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-category-header:hover {
+  background: var(--bytepilot-list-hover-bg);
+}
+
+.settings-category-arrow {
+  font-size: 10px;
+  width: 14px;
+  color: var(--bytepilot-fg-secondary);
+}
+
+.settings-category-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.settings-category-count {
+  font-size: 11px;
+  color: var(--bytepilot-fg-secondary);
+}
+
+.settings-category-body {
+  padding: 4px 0;
+}
+
+/* ── Color row ───────────────────────────────── */
+.settings-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+}
+
+.settings-color-row:hover {
+  background: var(--bytepilot-list-hover-bg);
+}
+
+.settings-color-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--bytepilot-fg-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-color-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.settings-color-swatch-wrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--bytepilot-border);
+}
+
+.settings-color-swatch {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.settings-color-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.settings-color-text {
+  width: 180px;
+  padding: 4px 6px;
+  border: 1px solid var(--bytepilot-input-border);
+  border-radius: 4px;
+  background: var(--bytepilot-input-bg);
+  color: var(--bytepilot-input-fg);
+  font-family: var(--bytepilot-editor-font-family, monospace);
+  font-size: 11px;
+  outline: none;
+}
+
+.settings-color-text:focus {
+  border-color: var(--bytepilot-focus-border);
+}
+
+.settings-color-swaps {
+  display: flex;
+  gap: 3px;
+}
+
+.settings-color-swap-btn {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--bytepilot-border);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.settings-color-swap-btn:hover {
+  transform: scale(1.15);
+}

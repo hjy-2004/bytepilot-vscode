@@ -34,6 +34,7 @@ interface ChatContainerDesktopProps {
   onDeleteSession: (id: string) => void;
   onPickWorkspace?: () => void;
   workspaceRoot?: string;
+  onOpenSettings?: () => void;
 }
 
 export const ChatContainerDesktop: React.FC<ChatContainerDesktopProps> = ({
@@ -58,6 +59,7 @@ export const ChatContainerDesktop: React.FC<ChatContainerDesktopProps> = ({
   onDeleteSession,
   onPickWorkspace,
   workspaceRoot,
+  onOpenSettings,
 }) => {
   const hasContent = messages.length > 0 || streamingText;
 
@@ -67,9 +69,17 @@ export const ChatContainerDesktop: React.FC<ChatContainerDesktopProps> = ({
       <div className="desktop-sidebar">
         <div className="desktop-sidebar-header">
           <span className="desktop-sidebar-title">BytePilot</span>
-          <button className="desktop-sidebar-new-btn" onClick={onNewSession}>
-            + New
-          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button className="desktop-sidebar-settings-btn" onClick={onOpenSettings} title="Settings">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <circle cx="8" cy="8" r="2.5"/>
+                <path d="M8 1.5v1.5M8 13v1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M1.5 8H3M13 8h1.5M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <button className="desktop-sidebar-new-btn" onClick={onNewSession}>
+              + New
+            </button>
+          </div>
         </div>
 
         <div className="desktop-session-list">
