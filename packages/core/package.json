@@ -1,10 +1,12 @@
 {
   "name": "@bytepilot/core",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "description": "Shared core logic for BytePilot — AI engine, tools, search, session management",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
