@@ -1,6 +1,6 @@
 {
   "name": "@bytepilot/tauri-app",
-  "version": "0.7.0",
+  "version": "0.7.5",
   "private": true,
   "description": "BytePilot desktop application powered by Tauri",
   "scripts": {
