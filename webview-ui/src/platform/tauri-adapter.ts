@@ -76,8 +76,25 @@ async function loadChat(){
     if(!wsRoot)return;
     const data=await invoke('cmd_load_chat',{workspace:wsRoot,sessionId})as{messages:Array<{role:string;content:string;tool_calls?:any;tool_call_id?:string}>};
     if(data.messages?.length>0){
+      // Load raw messages into hist for agent-loop compatibility
       hist=data.messages.map(m=>({role:m.role as Message['role'],content:m.content,toolCalls:m.tool_calls||undefined,toolCallId:m.tool_call_id||undefined}));
-      if(h)h({type:'chat.state',payload:{messages:hist.map(m=>({role:m.role,content:m.content}))}}as ExtensionMessage);
+      // Build restore payload: pair tool calls with their results
+      const toolResults=new Map<string,{result:string;success:boolean}>();
+      for(const m of data.messages){
+        if(m.role==='tool'&&m.tool_call_id&&typeof m.content==='string')
+          toolResults.set(m.tool_call_id,{result:m.content,success:!m.content.startsWith('Error')});
+      }
+      const restored=data.messages
+        .filter(m=>m.role==='user'||m.role==='assistant')
+        .filter(m=>m.content!=null)
+        .map(m=>{
+          const tcs=(m.tool_calls as any[]|undefined)?.map(tc=>{
+            const tr=toolResults.get(tc.id||tc.toolCallId);
+            return{...tc,displayName:(tc.name||'').replace(/_/g,' '),result:tr?.result,success:tr?.success,status:(tr?'done':'error')as 'done'|'error'};
+          })||[];
+          return{id:crypto.randomUUID?.()||`r-${Date.now()}`,role:m.role as'user'|'assistant',content:typeof m.content==='string'?m.content:'',timestamp:Date.now(),toolCalls:tcs};
+        });
+      if(h)h({type:'chat.state',payload:{messages:restored}}as ExtensionMessage);
     }
   }catch(e){console.log('[Adapter] No saved chat to restore')}
 }
@@ -85,7 +102,7 @@ async function loadChat(){
 async function listChatSessions(){
   if(!invoke)return;
   if(!wsRoot)return;
-  try{const ids=await invoke('cmd_list_sessions',{workspace:wsRoot})as string[];sessions=ids.map(id=>({id,title:`Chat ${id.slice(0,8)}`,messageCount:0,updatedAt:Date.now()}));if(h)h({type:'session.list',payload:{sessions}})}catch{}
+  try{const list=await invoke('cmd_list_sessions',{workspace:wsRoot})as Array<{id:string;title:string;message_count:number;updated_at:number}>;sessions=list.map(s=>({id:s.id,title:s.title||`Chat ${s.id.slice(0,8)}`,messageCount:s.message_count,updatedAt:s.updated_at}));if(h)h({type:'session.list',payload:{sessions}})}catch{}
 }
 
 function sysPrompt():string{

@@ -125,22 +125,60 @@ pub fn cmd_load_chat(
     }
 }
 
+#[derive(Serialize)]
+pub struct SessionMeta {
+    pub id: String,
+    pub title: String,
+    pub message_count: usize,
+    pub updated_at: u64,
+}
+
 #[tauri::command]
 pub fn cmd_list_sessions(
     workspace: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<SessionMeta>, String> {
     migrate_legacy_sessions(&workspace);
     let dir = project_dir(&workspace);
-    let mut ids = Vec::new();
+    let mut sessions = Vec::new();
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".jsonl") {
-                ids.push(name.replace(".jsonl", ""));
+            if !name.ends_with(".jsonl") { continue; }
+            let id = name.replace(".jsonl", "");
+            let path = entry.path();
+            let mut count = 0usize;
+            let mut title = String::new();
+            let mut updated = 0u64;
+            // Read file stats for mtime
+            if let Ok(meta) = path.metadata() {
+                if let Ok(m) = meta.modified() {
+                    updated = m.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+                }
             }
+            // Read file to count lines and extract first user message as title
+            if let Ok(content) = fs::read_to_string(&path) {
+                count = content.lines().filter(|l| !l.trim().is_empty()).count();
+                // Find first user message for title
+                for line in content.lines() {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                        if v.get("role").and_then(|r| r.as_str()) == Some("user") {
+                            if let Some(c) = v.get("content").and_then(|c| c.as_str()) {
+                                title = if c.len() > 60 {
+                                    format!("{}...", &c[..60])
+                                } else {
+                                    c.to_string()
+                                };
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            sessions.push(SessionMeta { id, title, message_count: count, updated_at: updated });
         }
     }
-    Ok(ids)
+    sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(sessions)
 }
 
 #[tauri::command]
