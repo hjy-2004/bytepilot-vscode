@@ -26,7 +26,7 @@ jobs:
         run: cd webview-ui && npm ci && npm run build
       - name: Package VSIX
         run: npx vsce package --no-dependencies
-      - name: Create GitHub Release
+      - name: Upload VSIX
         uses: softprops/action-gh-release@v2
         with:
           files: '*.vsix'
@@ -43,15 +43,12 @@ jobs:
           - os: ubuntu-latest
             name: linux-x64
             target: x86_64-unknown-linux-gnu
-            file: bytepilot_*_amd64.deb
           - os: windows-latest
             name: windows-x64
             target: x86_64-pc-windows-msvc
-            file: BytePilot_*_x64-setup.exe
           - os: macos-latest
             name: macos-arm64
             target: aarch64-apple-darwin
-            file: BytePilot_*_aarch64.dmg
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,8 +56,6 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
       - run: npm ci
       - name: Install webview UI dependencies
         run: cd webview-ui && npm ci
@@ -69,8 +64,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Build Tauri app
         run: cd packages/tauri-app && npm ci && npx tauri build --target ${{ matrix.target }}
+      - name: List bundle output
+        run: find packages/tauri-app/src-tauri/target -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" 2>/dev/null || true
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: packages/tauri-app/src-tauri/target/${{ matrix.target }}/release/bundle/**/${{ matrix.file }}
+          files: packages/tauri-app/src-tauri/target/${{ matrix.target }}/release/bundle/*/*
           generate_release_notes: true
