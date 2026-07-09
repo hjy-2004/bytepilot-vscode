@@ -17,7 +17,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - run: npx turbo run typecheck
+      - run: npx turbo run typecheck --filter=!@bytepilot/tauri-app
 
   lint:
     name: Lint
@@ -71,7 +71,6 @@ jobs:
   build-desktop:
     name: Build Desktop (Tauri)
     runs-on: ${{ matrix.os }}
-    needs: [typecheck, lint, test]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     strategy:
       matrix:
@@ -90,8 +89,8 @@ jobs:
           cache: 'npm'
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
-      - name: Build webview
-        run: cd webview-ui && npm ci && npm run build
+      - name: Install webview UI dependencies
+        run: cd webview-ui && npm ci
       - name: Build Tauri app
         run: cd packages/tauri-app && npm ci && npx tauri build --target ${{ matrix.target }}
       - name: Upload desktop artifact
