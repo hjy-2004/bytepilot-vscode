@@ -114,16 +114,50 @@ export class ContextCollector {
   }
 }
 
-/** Read .bytepilotrules from workspace root (plain text / markdown) */
+/**
+ * Load project instructions in priority order (last wins):
+ *   1. BYTEPILOT.md at workspace root (checked into git)
+ *   2. BYTEPILOT.local.md at workspace root (private, gitignored)
+ *   3. .bytepilotrules at workspace root (legacy fallback)
+ */
 async function collectProjectRules(workspaceRoot: string): Promise<string | undefined> {
+  const sources: string[] = [];
+
+  // 1. BYTEPILOT.md (project-level, checked into git)
+  const bpMdPath = path.join(workspaceRoot, 'BYTEPILOT.md');
+  try {
+    if (fs.existsSync(bpMdPath)) {
+      const content = fs.readFileSync(bpMdPath, 'utf-8').trim();
+      if (content) {
+        sources.push(content);
+        logInfo(`Loaded BYTEPILOT.md: ${content.length} chars`);
+      }
+    }
+  } catch { /* skip */ }
+
+  // 2. BYTEPILOT.local.md (private per-user, gitignored)
+  const localMdPath = path.join(workspaceRoot, 'BYTEPILOT.local.md');
+  try {
+    if (fs.existsSync(localMdPath)) {
+      const content = fs.readFileSync(localMdPath, 'utf-8').trim();
+      if (content) {
+        sources.push(content);
+        logInfo(`Loaded BYTEPILOT.local.md: ${content.length} chars`);
+      }
+    }
+  } catch { /* skip */ }
+
+  // 3. .bytepilotrules (legacy fallback)
   const rulesPath = path.join(workspaceRoot, '.bytepilotrules');
   try {
-    if (!fs.existsSync(rulesPath)) return undefined;
-    const content = fs.readFileSync(rulesPath, 'utf-8').trim();
-    if (!content) return undefined;
-    logInfo(`Loaded .bytepilotrules: ${content.length} chars`);
-    return content;
-  } catch {
-    return undefined;
-  }
+    if (fs.existsSync(rulesPath)) {
+      const content = fs.readFileSync(rulesPath, 'utf-8').trim();
+      if (content) {
+        sources.push(content);
+        logInfo(`Loaded .bytepilotrules (legacy): ${content.length} chars`);
+      }
+    }
+  } catch { /* skip */ }
+
+  return sources.length > 0 ? sources.join('\n\n') : undefined;
 }

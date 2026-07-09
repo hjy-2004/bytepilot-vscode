@@ -56,9 +56,10 @@ let sessionId='default';
 
 async function saveChat(){
   if(!invoke)return;
+  if(!wsRoot){console.warn('[Adapter] saveChat skipped: no workspace');return}
   try{
     const msgs=hist.map(m=>({role:m.role,content:m.content,tool_calls:m.toolCalls||null,tool_call_id:m.toolCallId||null}));
-    await invoke('cmd_save_chat',{sessionId,messages:msgs});
+    await invoke('cmd_save_chat',{workspace:wsRoot,sessionId,messages:msgs});
     console.log(`[Adapter] Chat saved: ${sessionId}, ${msgs.length} msgs`);
     // Update session list
     const sid=sessionId;
@@ -72,7 +73,8 @@ async function saveChat(){
 async function loadChat(){
   if(!invoke)return;
   try{
-    const data=await invoke('cmd_load_chat',{sessionId})as{messages:Array<{role:string;content:string;tool_calls?:any;tool_call_id?:string}>};
+    if(!wsRoot)return;
+    const data=await invoke('cmd_load_chat',{workspace:wsRoot,sessionId})as{messages:Array<{role:string;content:string;tool_calls?:any;tool_call_id?:string}>};
     if(data.messages?.length>0){
       hist=data.messages.map(m=>({role:m.role as Message['role'],content:m.content,toolCalls:m.tool_calls||undefined,toolCallId:m.tool_call_id||undefined}));
       if(h)h({type:'chat.state',payload:{messages:hist.map(m=>({role:m.role,content:m.content}))}}as ExtensionMessage);
@@ -82,7 +84,8 @@ async function loadChat(){
 
 async function listChatSessions(){
   if(!invoke)return;
-  try{const ids=await invoke('cmd_list_sessions')as string[];sessions=ids.map(id=>({id,title:`Chat ${id.slice(0,8)}`,messageCount:0,updatedAt:Date.now()}));if(h)h({type:'session.list',payload:{sessions}})}catch{}
+  if(!wsRoot)return;
+  try{const ids=await invoke('cmd_list_sessions',{workspace:wsRoot})as string[];sessions=ids.map(id=>({id,title:`Chat ${id.slice(0,8)}`,messageCount:0,updatedAt:Date.now()}));if(h)h({type:'session.list',payload:{sessions}})}catch{}
 }
 
 function sysPrompt():string{
@@ -168,7 +171,7 @@ async function loadWS(){
 
 async function pickWS(){
   if(!await ensureInvoke()){alert('Folder picker requires the desktop app.');return}
-  try{const f=await invoke!('cmd_pick_folder')as string|null;if(f){await invoke!('cmd_set_workspace',{path:f});wsRoot=f;await loadWS();hist=[];if(h)h({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}})}}
+  try{const f=await invoke!('cmd_pick_folder')as string|null;if(f){await invoke!('cmd_set_workspace',{path:f});wsRoot=f;await loadWS();hist=[];sessionId='default';await listChatSessions();if(h)h({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}})}}
   catch(e:any){alert('Failed: '+(e?.message||e))}
 }
 
@@ -207,9 +210,9 @@ export const tauriAdapter:IPlatformAdapter={
       case'config.importSpecific':importFromPayload((msg as any).payload);break;
       case'config.manualSetup':enterManualMode();break;
       case'session.list':listChatSessions();break;
-      case'session.create':{const id=`s-${Date.now()}`;sessionId=id;hist=[];saveChat();sessions.unshift({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
+      case'session.create':{const id=(globalThis.crypto?.randomUUID?.()||`s-${Date.now()}`);sessionId=id;hist=[];saveChat();sessions.unshift({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
       case'session.switch':{const sid=(msg as any).payload?.sessionId;if(sid){sessionId=sid;hist=[];loadChat();}break;}
-      case'session.delete':{const sid=(msg as any).payload?.sessionId;if(sid){sessions=sessions.filter(s=>s.id!==sid);invoke?.('cmd_delete_session',{sessionId:sid});if(sid===sessionId){sessionId='default';hist=[];loadChat();}if(h)h({type:'session.list',payload:{sessions}})}break;}
+      case'session.delete':{const sid=(msg as any).payload?.sessionId;if(sid){sessions=sessions.filter(s=>s.id!==sid);if(wsRoot)invoke?.('cmd_delete_session',{workspace:wsRoot,sessionId:sid});if(sid===sessionId){sessionId='default';hist=[];loadChat();}if(h)h({type:'session.list',payload:{sessions}})}break;}
       case'chat.send':doChat((msg as any).payload?.content||'');break;
       case'chat.cancel':ac?.abort();ac=null;break;
       case'chat.clear':hist=[];if(h)h({type:'chat.clear'}as ExtensionMessage);break;
@@ -228,8 +231,11 @@ function enqueue(){if(h)sendInit(h)}
 function sendInit(dest:(m:ExtensionMessage)=>void){
   if(inited)return;inited=true;
   sendCfg();
-  loadChat().then(()=>listChatSessions());
-  loadWS().then(()=>{if(dest===h)dest({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}})});
+  // loadWorkspace FIRST, then load chat + session list (both need wsRoot)
+  loadWS().then(()=>{
+    if(dest===h)dest({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}});
+    return loadChat();
+  }).then(()=>listChatSessions());
 }
 function sendCfg(){if(h)h({type:'config.state',payload:{...cfg}})}
 

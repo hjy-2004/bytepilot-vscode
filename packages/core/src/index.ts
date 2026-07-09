@@ -32,6 +32,11 @@ export { diffFileTool } from './tools/diff-file';
 
 // ── Config ────────────────────────────────────────────────────────────
 export {
+  loadBytePilotMd,
+  buildBytePilotMdPrompt,
+} from './config/bytepilot-md';
+export type { BytePilotMdSection } from './config/bytepilot-md';
+export {
   getProviderPreset,
   getAllProviders,
   getProvidersByCategory,
@@ -70,7 +75,30 @@ export {
   loadSessionDiffs,
   maybePruneHistory,
   listSessions,
+  listAllSessions,
+  resolveSessionFilePath,
 } from './session/history';
+export type { SessionInfo } from './session/history';
+export {
+  readSessionSummary,
+  writeSessionSummary,
+} from './session/session-memory';
+export type { SessionSummary } from './session/session-memory';
+
+// ── Memory ─────────────────────────────────────────────────────────────
+export {
+  getAutoMemPath,
+  isAutoMemPath,
+  getAutoMemEntrypoint,
+} from './memory/paths';
+export {
+  readMemory,
+  writeMemory,
+  deleteMemory,
+  listMemoryFiles,
+  readAllMemories,
+} from './memory/store';
+export type { MemoryEntry, MemoryType } from './memory/types';
 
 // ── Search ────────────────────────────────────────────────────────────
 export { SemanticSearch, getSemanticSearch, initSemanticSearch } from './search/semantic-search';
@@ -78,6 +106,7 @@ export type { SearchFileProvider } from './search/semantic-search';
 export { FileCache } from './search/cache';
 
 // ── Utils ─────────────────────────────────────────────────────────────
+export { sanitizePath, djb2Hash } from './utils/paths';
 export { computeDiffFromContent, computeDiffFromPaths } from './utils/diff-helper';
 export { estimateTokens, estimateMessageTokens, trimContextToBudget, checkContextBudget } from './utils/token-counter';
 export {

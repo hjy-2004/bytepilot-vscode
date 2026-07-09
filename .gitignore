@@ -31,3 +31,4 @@ webview-ui/dist/
 # Local chat sessions / app state (never commit conversation history)
 .bytepilot/
 **/.bytepilot/
+BYTEPILOT.local.md

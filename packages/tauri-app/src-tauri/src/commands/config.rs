@@ -9,6 +9,7 @@ use tauri::State;
 /// All fields default to empty — only populated after the user explicitly
 /// selects a provider or enters configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Settings {
     #[serde(default)]
     pub provider: String,
