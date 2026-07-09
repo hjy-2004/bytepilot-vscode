@@ -64,8 +64,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Build Tauri app
         run: cd packages/tauri-app && npm ci && npx tauri build --target ${{ matrix.target }}
-      - name: List bundle output
-        run: find packages/tauri-app/src-tauri/target -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" 2>/dev/null || true
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
