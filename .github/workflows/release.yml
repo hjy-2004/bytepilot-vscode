@@ -18,18 +18,14 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - name: Build
-        run: |
-          cd packages/core && npm run build
-          cd ../..
-          node esbuild.config.mjs
-          cd webview-ui && npm ci && npm run build
+      - name: Build core
+        run: npm run build:core
+      - name: Build extension
+        run: node esbuild.config.mjs
+      - name: Build webview (VS Code theme)
+        run: cd webview-ui && npm ci && npm run build
       - name: Package VSIX
-        run: npx vsce package
-      - name: Publish to VS Code Marketplace
-        run: npx vsce publish --packagePath *.vsix
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx vsce package --no-dependencies
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -46,13 +42,20 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux-x64
+            target: x86_64-unknown-linux-gnu
             file: bytepilot_*_amd64.deb
           - os: windows-latest
             name: windows-x64
-            file: bytepilot_*_x64-setup.exe
+            target: x86_64-pc-windows-msvc
+            file: BytePilot_*_x64-setup.exe
           - os: macos-latest
             name: macos-x64
-            file: bytepilot_*_x64.dmg
+            target: x86_64-apple-darwin
+            file: BytePilot_*_x64.dmg
+          - os: macos-latest
+            name: macos-arm64
+            target: aarch64-apple-darwin
+            file: BytePilot_*_aarch64.dmg
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,11 +63,14 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - run: npm ci
-      - name: Build webview
-        run: cd webview-ui && npm ci && npm run build
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Build Tauri app
-        run: cd packages/tauri-app && npm ci && npx tauri build
+        run: cd packages/tauri-app && npm ci && npx tauri build --target ${{ matrix.target }}
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
