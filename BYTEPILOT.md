@@ -1,6 +1,6 @@
-# CLAUDE.md
+# BYTEPILOT.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to BytePilot and other AI coding assistants when working with code in this repository.
 
 ## Overview
 
@@ -13,10 +13,10 @@ BytePilot is a Cursor-like AI coding assistant supporting VS Code extension and 
 npm run build
 
 # Build subsets
-npm run build:core          # tsc compile @bytepilot/core
-npm run build:ext           # esbuild bundle extension
-npm run build:webview       # Vite build webview UI (VS Code theme)
-npm run build:webview:desktop  # Vite build webview UI (desktop theme)
+npm run build:core              # tsc compile @bytepilot/core
+npm run build:ext               # esbuild bundle extension
+npm run build:webview           # Vite build webview UI (VS Code theme)
+npm run build:webview:desktop   # Vite build webview UI (desktop theme)
 
 # Watch (extension only)
 npm run watch
@@ -34,8 +34,8 @@ npx turbo run test
 npm run build && npx vsce package
 
 # Tauri desktop dev
-npm run build:webview
-cd packages/tauri-app && npm install && npm run dev
+npm run build:webview:desktop
+cd packages/tauri-app && npm install && npm run dev:tauri
 ```
 
 ## Architecture
@@ -59,16 +59,17 @@ extension_plugin/
 │   └── src/
 │       ├── ai/                  # agent-loop.ts, api-client.ts, provider-factory.ts, stream-bridge.ts
 │       ├── tools/               # registry.ts, diff-file.ts, tool definitions
-│       ├── config/              # 60+ provider presets, settings-manager, validator
-│       ├── session/             # JSONL-based chat persistence
+│       ├── config/              # 60+ provider presets, settings-manager, validator, bytepilot-md loader
+│       ├── session/             # JSONL chat persistence, session-memory summaries
+│       ├── memory/              # Auto-memory system (memdir) with CRUD
 │       ├── search/              # BM25 semantic search
 │       ├── types/               # Shared TypeScript interfaces (AI, IPC, platform, tools)
 │       ├── platform/            # Abstract interfaces: ILogger, IFileSystem, IConfigStore
-│       └── utils/               # token-counter, diff-helper, ai-logger
+│       └── utils/               # token-counter, diff-helper, ai-logger, paths (sanitizePath)
 │
 ├── packages/tauri-app/          # @bytepilot/tauri-app — Tauri desktop
 │   ├── src/                     # TS platform adapters + app entry
-│   └── src-tauri/src/commands/  # Rust backend: fs.rs, config.rs, shell.rs, log.rs
+│   └── src-tauri/src/commands/  # Rust backend: chat.rs, config.rs, fs.rs, shell.rs, log.rs, workspace.rs
 │
 ├── webview-ui/                  # React 18 + Zustand 5 + Vite (shared by both platforms)
 │   ├── platform/                # IPlatformAdapter — vscode.ts / tauri.ts (postMessage bridge)
@@ -114,7 +115,24 @@ Settings are stored in `~/.bytepilot/settings.json` (shared across VS Code and d
 
 ### Chat persistence
 
-Sessions are stored as JSONL files under `~/.bytepilot/projects/<hashed-workspace-path>/`. Each session is a `.jsonl` file with one JSON object per line (one per message). History is loaded on startup and saved after each message.
+Sessions are stored as JSONL files under `~/.bytepilot/projects/<sanitized-workspace-path>/`. Each session is a `.jsonl` file with one JSON object per line (one per message). History is loaded on startup and saved after each message.
+
+The `sanitizePath()` utility (`packages/core/src/utils/paths.ts`) converts workspace paths to human-readable directory names: `D:\extension_plugin` → `D--extension-plugin`. Legacy SHA-256 hash directories are auto-migrated.
+
+### Auto-memory (memdir)
+
+Memory files are stored per-project at `~/.bytepilot/projects/<sanitized-git-root>/memory/`. Each memory topic is a `.md` file with YAML frontmatter (`name`, `description`, `type`). The `MEMORY.md` entrypoint serves as an index. Memory types: `user`, `feedback`, `project`, `reference`.
+
+### Per-session summary
+
+Each session directory has a `session-memory/summary.md` file for tracking session state, task specification, files involved, errors, learnings, and key results.
+
+### Project instructions (BYTEPILOT.md)
+
+Project instructions are loaded from multiple sources in priority order:
+1. `BYTEPILOT.md` at workspace root (checked into git)
+2. `BYTEPILOT.local.md` at workspace root (private, gitignored)
+3. `.bytepilotrules` at workspace root (legacy fallback)
 
 ### CJK token counting
 
