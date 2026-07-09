@@ -117,7 +117,7 @@ export async function runAgentLoop(
           cb.onToolResult(tc.id, tc.name, r.result, r.success);
           cb.onHistoryChanged?.();
         } catch (err: any) {
-          const msg = `Error: ${err.message}`;
+          const msg = `Error: ${err?.message || err}`;
           logToolCallResult(tc.id, tc.name, false, msg, Date.now() - t0);
           history.push({ role: 'tool', toolCallId: tc.id, content: msg });
           cb.onToolResult(tc.id, tc.name, msg, false);
@@ -134,7 +134,7 @@ export async function runAgentLoop(
   } catch (err: any) {
     if (err.name === 'AbortError') return;
     logError('Agent loop error', err);
-    logAiError(err.message);
+    logAiError(err?.message || String(err));
     throw err;
   }
 

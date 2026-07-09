@@ -30,6 +30,7 @@ Cursor-like AI coding assistant supporting both **VS Code extension** and **Taur
 - **CJK Token Counting** — CJK-aware token estimation (~1.5 chars/token for Chinese/Japanese/Korean, ~4 for ASCII)
 - **Theme Customization** — Desktop app supports custom themes with light/dark presets and 50+ adjustable color variables
 - **Structured Logging** — File-based logging on desktop (`%APPDATA%/BytePilot/logs/`)
+- **Auto-Update (Desktop)** — Checks GitHub Releases for updates on startup, notifies users to upgrade
 - **Cross-Platform** — 70%+ code shared between VS Code plugin and Tauri desktop app
 - **Security** — Workspace boundary checks (canonicalized to block `..` traversal, unified across both platforms), dangerous-command interception on both platforms, shell timeout process kill, and consent-gated execution of `apiKeyHelper` during config import
 

@@ -63,6 +63,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
 
   useEffect(() => { textareaRef.current?.focus(); }, []);
   useEffect(() => {
+    if (!isStreaming) textareaRef.current?.focus();
+  }, [isStreaming]);
+  useEffect(() => {
     const el = textareaRef.current;
     if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
   }, [input]);
@@ -247,7 +250,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, isStream
     useChatStore.getState().addToInputHistory(trimmed);
     onSend(trimmed, imageAttachments.length > 0 ? imageAttachments : undefined);
     setInput(''); setSelectedFiles([]); setImageAttachments([]); setHistoryIndex(-1);
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.focus();
+    }
   }, [input, imageAttachments, isStreaming, onSend]);
 
   return (

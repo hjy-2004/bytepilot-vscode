@@ -36,6 +36,15 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/hjy-2004/bytepilot-vscode/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwNkQyQjMyRTJDRjEyM0YKUldRL0VzL2lNaXR0c0o2Qk5QbkoxQ0k4ai92dDlZNXVWMnFZcVlBRUJ0UmpRK21OT2o4TGY4Ry8K",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

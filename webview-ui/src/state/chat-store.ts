@@ -140,21 +140,25 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setToolPendingApproval: (id, diff) => {
     set((s) => ({
       messages: s.messages.map((m) =>
-        m.toolCalls ? { ...m, toolCalls: m.toolCalls.map((tc) => tc.id === id ? { ...tc, status: 'pending_approval' as const, diff } : tc) } : m
+        m.toolCalls?.some(tc => tc.id === id)
+          ? { ...m, toolCalls: m.toolCalls.map((tc) => tc.id === id ? { ...tc, status: 'pending_approval' as const, diff } : tc) }
+          : m
       ),
     }));
   },
   setToolRunning: (id) => {
     set((s) => ({
       messages: s.messages.map((m) =>
-        m.toolCalls ? { ...m, toolCalls: m.toolCalls.map((tc) => tc.id === id ? { ...tc, status: 'running' as const } : tc) } : m
+        m.toolCalls?.some(tc => tc.id === id)
+          ? { ...m, toolCalls: m.toolCalls.map((tc) => tc.id === id ? { ...tc, status: 'running' as const } : tc) }
+          : m
       ),
     }));
   },
   updateToolResult: (id, result, success, diff?) => {
     set((s) => ({
       messages: s.messages.map((m) => {
-        if (m.toolCalls) {
+        if (m.toolCalls?.some(tc => tc.id === id)) {
           return {
             ...m,
             toolCalls: m.toolCalls.map((tc) =>

@@ -49,7 +49,7 @@ export const readDiagnosticsTool: ToolDef = {
       }
       return lines.join('\n');
     } catch (err: any) {
-      return `Error: ${err.message}`;
+      return `Error: ${err?.message || err}`;
     }
   },
 };

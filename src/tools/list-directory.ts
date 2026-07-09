@@ -54,7 +54,7 @@ export const listDirectoryTool: ToolDef = {
       if (result.length >= 200) result.push('... (truncated)');
       return result.join('\n');
     } catch (err: any) {
-      return `Error: ${err.message}`;
+      return `Error: ${err?.message || err}`;
     }
   },
 };

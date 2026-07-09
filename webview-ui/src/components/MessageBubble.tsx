@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './CodeBlock';
@@ -77,6 +77,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
 
   const isFlat = variant === 'flat';
 
+  const processedContent = useMemo(
+    () => preprocessContent(message.content),
+    [message.content],
+  );
+
   return (
     <div style={{
       display: 'flex',
@@ -136,7 +141,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           }}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              children={preprocessContent(message.content)}
+              children={processedContent}
               components={{
                 code({ className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');

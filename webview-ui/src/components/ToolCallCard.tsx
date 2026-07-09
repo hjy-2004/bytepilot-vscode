@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { ToolCallEntry } from '../state/chat-store';
 import { useChatStore } from '../state/chat-store';
 import { usePlatform } from '../hooks/usePlatform';
@@ -46,6 +46,19 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [toolCall.status]);
+
+  // Memoize expensive computations — avoids re-stringifying on every parent re-render
+  const argsJson = useMemo(() => {
+    if (Object.keys(toolCall.args).length === 0) return null;
+    return JSON.stringify(toolCall.args, null, 2);
+  }, [toolCall.args]);
+
+  const displayResult = useMemo(() => {
+    if (!toolCall.result) return null;
+    return toolCall.result.length > 2000
+      ? toolCall.result.slice(0, 2000) + '\n...(truncated)'
+      : toolCall.result;
+  }, [toolCall.result]);
 
   const isPending = toolCall.status === 'pending_approval';
   const isRunning = toolCall.status === 'running';
@@ -146,7 +159,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
               {toolCall.diff ? (
                 <DiffView diff={toolCall.diff} />
               ) : (
-                Object.keys(toolCall.args).length > 0 && (
+                argsJson && (
                   <div style={{ marginBottom: '4px' }}>
                     <div style={{ fontWeight: 600, marginBottom: '2px' }}>Arguments:</div>
                     <pre style={{
@@ -158,7 +171,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                       maxHeight: '120px',
                       margin: 0,
                     }}>
-                      {JSON.stringify(toolCall.args, null, 2)}
+                      {argsJson}
                     </pre>
                   </div>
                 )
@@ -190,7 +203,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
             </>
           ) : (
             <>
-              {Object.keys(toolCall.args).length > 0 && !toolCall.diff && (
+              {argsJson && !toolCall.diff && (
                 <div style={{ marginBottom: '4px' }}>
                   <div style={{ fontWeight: 600, marginBottom: '2px' }}>Arguments:</div>
                   <pre style={{
@@ -202,7 +215,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                     maxHeight: '120px',
                     margin: 0,
                   }}>
-                    {JSON.stringify(toolCall.args, null, 2)}
+                    {argsJson}
                   </pre>
                 </div>
               )}
@@ -243,9 +256,7 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = React.memo(({ toolCall 
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
                     }}>
-                      {toolCall.result.length > 2000
-                        ? toolCall.result.slice(0, 2000) + '\n...(truncated)'
-                        : toolCall.result}
+                      {displayResult}
                     </pre>
                   )}
                 </div>

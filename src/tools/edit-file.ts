@@ -117,7 +117,7 @@ export const editFileTool: ToolDef = {
       const changed = changedLines !== 0 ? ` (${changedLines > 0 ? '+' : ''}${changedLines} lines)` : '';
       return `Successfully edited ${args.filePath}: replaced ${oldStr.length}→${newStr.length} chars${changed}.`;
     } catch (err: any) {
-      return `Error editing file: ${err.message}`;
+      return `Error editing file: ${err?.message || err}`;
     }
   },
 };

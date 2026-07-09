@@ -201,7 +201,7 @@ export class ChatEngine {
         try {
           const r = await this.toolRegistry.execute(name, args);
           return { result: r, success: !r.startsWith('Error') };
-        } catch (e: any) { return { result: `Error: ${e.message}`, success: false }; }
+        } catch (e: any) { return { result: `Error: ${e?.message || e}`, success: false }; }
       },
       isReadOnly: (name) => { const t = this.toolRegistry.get(name); return t?.isReadOnly() ?? false; },
       onHistoryChanged: () => {

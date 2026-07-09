@@ -17,14 +17,15 @@
   "dependencies": {
     "@bytepilot/core": "*",
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@tauri-apps/plugin-store": "^2.0.0",
-    "@tauri-apps/plugin-dialog": "^2.0.0"
+    "@tauri-apps/plugin-updater": "^2.10.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
-    "typescript": "^5.5.0",
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0"
   }
 }

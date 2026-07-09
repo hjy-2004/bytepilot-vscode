@@ -44,7 +44,7 @@ export const readFileTool: ToolDef = {
       return `${args.filePath} (L${start + 1}-${end}/${lines.length})${note}\n\n${output}`;
     } catch (err: any) {
       if (err.code === 'FileNotFound' || err.code === 'ENOENT') return `Error: File not found: ${args.filePath}`;
-      return `Error: ${err.message}`;
+      return `Error: ${err?.message || err}`;
     }
   },
 };

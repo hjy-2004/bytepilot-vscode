@@ -55,7 +55,7 @@ export const diffFileTool: ToolDef = {
         return `Diff against HEAD: ${diff.stats.additions} additions, ${diff.stats.deletions} deletions across ${diff.hunks.length} hunks.`;
       }
     } catch (err: any) {
-      return `Error computing diff: ${err.message}`;
+      return `Error computing diff: ${err?.message || err}`;
     }
   },
 };

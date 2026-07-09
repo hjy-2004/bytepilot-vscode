@@ -63,7 +63,7 @@ export const writeFileTool: ToolDef = {
 
       return `Wrote ${args.content.split('\n').length} lines to "${args.filePath}".`;
     } catch (err: any) {
-      return `Error writing file: ${err.message}`;
+      return `Error writing file: ${err?.message || err}`;
     }
   },
 };

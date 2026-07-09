@@ -145,9 +145,9 @@ async function handleRpc(req: RpcRequest): Promise<void> {
           if (id !== undefined) sendResponse(id, { status: 'ok' });
         } catch (err: any) {
           if (err.name !== 'AbortError') {
-            sendNotification('chat.error', { message: err.message || 'Chat failed' });
+            sendNotification('chat.error', { message: err?.message || String(err) || 'Chat failed' });
           }
-          if (id !== undefined) sendResponse(id, { status: 'error', message: err.message });
+          if (id !== undefined) sendResponse(id, { status: 'error', message: err?.message || String(err) });
         }
         break;
       }
@@ -167,7 +167,7 @@ async function handleRpc(req: RpcRequest): Promise<void> {
         sendError(id || 0, -32601, `Method not found: ${method}`);
     }
   } catch (err: any) {
-    sendError(id || 0, -32603, err.message || 'Internal error');
+    sendError(id || 0, -32603, err?.message || String(err) || 'Internal error');
   }
 }
 
@@ -258,7 +258,7 @@ The workspace root is: ${wsRoot}
                 const result = await rpcInvoke('tool.execute', { name, args });
                 return { result: typeof result === 'string' ? result : JSON.stringify(result), success: true };
               } catch (e: any) {
-                return { result: `Error: ${e.message}`, success: false };
+                return { result: `Error: ${e?.message || e}`, success: false };
               }
             },
             isReadOnly: () => true, // Sidecar tools are all read-only until RPC is set up

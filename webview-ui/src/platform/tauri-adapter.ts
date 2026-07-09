@@ -9,6 +9,7 @@ import type { Message } from '@bytepilot/core/ai/message-types';
 import { generateEnvBlock } from '@bytepilot/core/config/settings-manager';
 import { getProviderPreset, detectApiFormat } from '@bytepilot/core/config/provider-presets';
 import { parseClaudeConfig, stripAnsi, KNOWN_CONFIG_PATHS, resolveImportBaseURL } from '@bytepilot/core/config/importer';
+import { check } from '@tauri-apps/plugin-updater';
 
 // ── Tool definitions ─────────────────────────────────────────────────
 
@@ -145,9 +146,15 @@ async function initTauri(){
 
 async function ensureInvoke():Promise<boolean>{if(invoke)return true;await initTauri();return!!invoke}
 
+let saveCfgTimer:ReturnType<typeof setTimeout>|undefined;
 async function saveCfg(){
-  if(!await ensureInvoke()){console.warn('[Adapter] Cannot save: no Rust backend');return}
-  try{
+  // Debounce: rapid successive calls (e.g. config.set + config.setKey) only trigger one save
+  if(saveCfgTimer)clearTimeout(saveCfgTimer);
+  return new Promise<void>((resolve)=>{
+    saveCfgTimer=setTimeout(async()=>{
+      saveCfgTimer=undefined;
+      if(!await ensureInvoke()){console.warn('[Adapter] Cannot save: no Rust backend');resolve();return}
+      try{
     await invoke!('cmd_set_config',{key:'provider',value:cfg.provider});
     await invoke!('cmd_set_config',{key:'chatModel',value:cfg.chatModel});
     await invoke!('cmd_set_config',{key:'baseURL',value:cfg.baseURL});
@@ -177,6 +184,9 @@ async function saveCfg(){
 
     console.log('[Adapter] Config saved:',cfg.provider,cfg.chatModel,apiFormat);
   }catch(e){console.error('[Adapter] Save error:',e)}
+      resolve();
+    }, 100);
+  });
 }
 
 // ── Workspace ────────────────────────────────────────────────────────
@@ -219,7 +229,7 @@ export const tauriAdapter:IPlatformAdapter={
     console.log('[Adapter]',msg.type);
     switch(msg.type){
       case'config.get':if(inited)sendCfg();break; // Only respond AFTER initTauri loaded config
-      case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=getProviderPreset(p.provider);cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.defaultChatModel||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.baseURL||cfg.baseURL)}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;const displayName=getProviderPreset(cfg.provider)?.name||cfg.provider;cfg.displayProvider=displayName+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
+      case'config.set':{const p=(msg as any).payload||{};if(p.provider){const pr=getProviderPreset(p.provider);cfg.provider=p.provider;cfg.chatModel=p.chatModel||pr?.defaultChatModel||cfg.chatModel;cfg.baseURL=p.baseURL!==undefined?p.baseURL:(pr?.baseURL||cfg.baseURL);if(invoke&&!keys.find(k=>k.pid===p.provider)){invoke('cmd_get_config',{key:'apiKey'}).then((k:any)=>{if(k&&typeof k==='string'&&k.trim())keys.push({pid:p.provider,key:k.trim()});}).catch(()=>{})}}else if(p.chatModel)cfg.chatModel=p.chatModel;if(p.baseURL!==undefined)cfg.baseURL=p.baseURL;const displayName=getProviderPreset(cfg.provider)?.name||cfg.provider;cfg.displayProvider=displayName+' (Desktop)';saveCfg();if(h)h({type:'config.state',payload:{...cfg}});break;}
       case'config.setKey':{const pk=(msg as any).payload||{};const ex=keys.find(k=>k.pid===pk.providerId);if(ex)ex.key=pk.apiKey;else keys.push({pid:pk.providerId,key:pk.apiKey});saveCfg();break;}
       case'models.fetch':(async()=>{const k=keys.find(x=>x.pid===cfg.provider)?.key||'';try{const r=await fetch(`${cfg.baseURL.replace(/\/+$/,'')}/models`,{headers:k?{Authorization:`Bearer ${k}`}:{},signal:AbortSignal.timeout(10000)});if(r.ok){const d=await r.json()as any;const list=(d.data||d.models||[]).map((m:any)=>({id:m.id||m.name?.replace('models/','')||'',name:m.name||m.id||''})).filter((m:any)=>m.id);if(h)h({type:'models.list',payload:{models:list,sourceUrl:cfg.baseURL}})}}catch{}})();break;
       case'config.scan':scanConfigs();break;
@@ -229,7 +239,7 @@ export const tauriAdapter:IPlatformAdapter={
       case'session.list':listChatSessions();break;
       case'session.create':{const id=(globalThis.crypto?.randomUUID?.()||`s-${Date.now()}`);sessionId=id;hist=[];saveChat();sessions.unshift({id,title:'New Chat',messageCount:0,updatedAt:Date.now()});if(h)h({type:'session.list',payload:{sessions}});break;}
       case'session.switch':{const sid=(msg as any).payload?.sessionId;if(sid){sessionId=sid;hist=[];loadChat();}break;}
-      case'session.delete':{const sid=(msg as any).payload?.sessionId;if(sid){sessions=sessions.filter(s=>s.id!==sid);if(wsRoot)invoke?.('cmd_delete_session',{workspace:wsRoot,sessionId:sid});if(sid===sessionId){sessionId='default';hist=[];loadChat();}if(h)h({type:'session.list',payload:{sessions}})}break;}
+      case'session.delete':{const sid=(msg as any).payload?.sessionId;if(sid){sessions=sessions.filter(s=>s.id!==sid);if(wsRoot)invoke?.('cmd_delete_session',{workspace:wsRoot,sessionId:sid});if(sid===sessionId){const next=sessions[0];if(next){sessionId=next.id;hist=[];loadChat();}else{sessionId='default';hist=[];if(h)h({type:'chat.clear'}as ExtensionMessage);}}if(h)h({type:'session.list',payload:{sessions}})}break;}
       case'chat.send':doChat((msg as any).payload?.content||'');break;
       case'chat.cancel':ac?.abort();ac=null;break;
       case'chat.clear':hist=[];if(h)h({type:'chat.clear'}as ExtensionMessage);break;
@@ -245,9 +255,18 @@ export const tauriAdapter:IPlatformAdapter={
 };
 
 function enqueue(){if(h)sendInit(h)}
+async function checkForUpdate(){
+  try{
+    const update=await check();
+    if(update&&h){
+      h({type:'chat.error',payload:{message:`Update available: v${update.version}. Please restart to update.`,code:'UPDATE_AVAILABLE'}}as ExtensionMessage);
+    }
+  }catch{/* updater not available or check failed — ignore */}
+}
 function sendInit(dest:(m:ExtensionMessage)=>void){
   if(inited)return;inited=true;
   sendCfg();
+  checkForUpdate();
   // loadWorkspace FIRST, then load chat + session list (both need wsRoot)
   loadWS().then(()=>{
     if(dest===h)dest({type:'context.update',payload:{openFiles:[],projectFiles:projFiles.length,diagnosticsCount:0,hasRules:!!rules,workspaceRoot:wsRoot}});
@@ -441,18 +460,33 @@ async function doChat(content: string) {
       const sargs = args as Record<string, string>;
       const tid = pendingToolId;
       if ((name === 'write_file' || name === 'edit_file') && args.path && invoke) {
+        const p = (args.path || (args as any).filePath || '') as string;
+
+        // Read original for diff (write_file: may fail for new files; edit_file: must exist)
+        let orig = '';
         try {
-          const p = (args.path || (args as any).filePath || '') as string;
-          const orig = await invoke('cmd_read_file_workspace', { relativePath: p }) as string;
-          const r = await execTool(name, sargs);
-          const nc = await invoke('cmd_read_file_workspace', { relativePath: p }) as string;
-          const diff = mkdiff(p, orig || '', nc || '');
-          if (diff) toolDiffs.set(tid, diff);
-          const ok = !r.startsWith('Error');
-          return { result: r, success: ok };
+          orig = await invoke('cmd_read_file_workspace', { relativePath: p }) as string;
         } catch (e: any) {
-          return { result: `Error: ${e.message}`, success: false };
+          if (name === 'edit_file') {
+            return { result: `Error: cannot read file — ${e?.message || e}`, success: false };
+          }
+          // write_file: file doesn't exist yet, that's fine
         }
+
+        // Execute the write
+        const r = await execTool(name, sargs);
+        const ok = !r.startsWith('Error');
+
+        // Re-read for diff (skip if write failed, or if file is outside workspace)
+        if (ok) {
+          try {
+            const nc = await invoke('cmd_read_file_workspace', { relativePath: p }) as string;
+            const diff = mkdiff(p, orig, nc);
+            if (diff) toolDiffs.set(tid, diff);
+          } catch { /* re-read failed, skip diff */ }
+        }
+
+        return { result: r, success: ok };
       }
       const r = await execTool(name, sargs);
       return { result: r, success: !r.startsWith('Error') };

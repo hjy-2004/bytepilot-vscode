@@ -259,10 +259,16 @@ pub async fn cmd_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, St
 #[tauri::command]
 pub async fn cmd_pick_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
-    Ok(app
-        .dialog()
-        .file()
+    #[cfg(target_os = "windows")]
+    let home = std::env::var("USERPROFILE").ok();
+    #[cfg(not(target_os = "windows"))]
+    let home = std::env::var("HOME").ok();
+
+    let mut dialog = app.dialog().file()
         .add_filter("JSON", &["json"])
-        .blocking_pick_file()
-        .map(|p| p.to_string()))
+        .add_filter("All Files", &["*"]);
+    if let Some(h) = home {
+        dialog = dialog.set_directory(std::path::PathBuf::from(h));
+    }
+    Ok(dialog.blocking_pick_file().map(|p| p.to_string()))
 }

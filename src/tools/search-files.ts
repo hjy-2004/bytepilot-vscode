@@ -58,7 +58,7 @@ export const searchFilesTool: ToolDef = {
           ? snippets.join('\n\n---\n\n')
           : `No results for "${args.pattern}"`;
       } catch (err: any) {
-        return `Semantic search error: ${err.message}.`;
+        return `Semantic search error: ${err?.message || err}.`;
       }
     }
 
@@ -92,7 +92,7 @@ export const searchFilesTool: ToolDef = {
       }
       return results.length === 0 ? `No matches for "${args.pattern}"` : results.map(r => `${r.file}:${r.line} | ${r.text}`).join('\n');
     } catch (err: any) {
-      return `Search error: ${err.message}`;
+      return `Search error: ${err?.message || err}`;
     }
   },
 };

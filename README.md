@@ -44,6 +44,7 @@
 - **Auto Config** — 首次启动自动创建 `~/.bytepilot/settings.json` 空占位文件，可从 `.claude/settings.json` 一键导入配置
 - **Theme Customization** — 桌面端支持自定义主题配色，预设浅色/深色模式，可调整 50+ 颜色变量
 - **Structured Logging** — 统一日志（桌面端支持文件日志 `%APPDATA%/BytePilot/logs/`）
+- **Auto-Update (Desktop)** — 桌面端启动时自动检测 GitHub Releases 更新，提示用户升级
 - **Cross-Platform** — 70%+ 代码在 VS Code 和桌面端之间共享
 - **Security** — 工作区路径边界检查（canonicalize 防 `..` 穿越，双平台统一）、双平台危险命令拦截、Shell 超时杀进程、配置导入的 apiKeyHelper 需显式确认后才执行
 

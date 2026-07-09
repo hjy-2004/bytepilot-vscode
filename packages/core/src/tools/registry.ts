@@ -114,7 +114,7 @@ export class ToolRegistry {
       return await t.call(args, execCtx);
     } catch (err: any) {
       logError(`Tool ${name} failed`, err);
-      return `Error: ${err.message}`;
+      return `Error: ${err?.message || err}`;
     }
   }
 

@@ -201,9 +201,14 @@ const AppDesktop: React.FC = () => {
   }, [postMessage]);
 
   const handleDeleteSession = useCallback((id: string) => {
+    // Clear UI immediately when deleting the active session
+    if (id === activeSessionId) {
+      useChatStore.getState().clearMessages();
+      setActiveSessionId(null);
+    }
     postMessage({ type: 'session.delete', payload: { sessionId: id } } as any);
     setTimeout(refreshSessionList, 200);
-  }, [postMessage, refreshSessionList]);
+  }, [postMessage, refreshSessionList, activeSessionId]);
 
   // Request initial state on mount
   useEffect(() => {
