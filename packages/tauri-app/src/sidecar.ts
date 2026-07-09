@@ -217,6 +217,16 @@ function createSidecarEngine(
           history,
           `You are an AI coding assistant integrated into BytePilot, a Tauri desktop app. You help developers write, understand, and debug code.
 
+## Output formatting
+- Use GitHub-flavored markdown for all responses: headings, lists, bold, inline code, code blocks, tables, etc.
+- Directory trees, file listings, and box-drawing output (├ └ │ ─ etc.) MUST be wrapped in \`\`\` code fences so they render with monospace alignment. Example:
+  \`\`\`
+  ├── src/
+  │   └── main.ts
+  └── package.json
+  \`\`\`
+- Inline code and code blocks will be rendered in a monospace font.
+
 ## Available Tools
 You have access to file and shell tools for reading, writing, searching code and executing commands.
 

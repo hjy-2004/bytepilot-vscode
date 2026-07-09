@@ -24,43 +24,61 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
       margin: '8px 0',
       border: '1px solid var(--bytepilot-border)',
     }}>
-      {/* Header bar */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '4px 8px',
-        background: 'var(--bytepilot-titlebar-bg)',
-        fontSize: '11px',
-        color: 'var(--bytepilot-fg-secondary)',
-      }}>
-        <span>{language}</span>
-        <button
-          onClick={handleCopy}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--bytepilot-fg-secondary)',
-            cursor: 'pointer',
-            fontSize: '11px',
-          }}
-        >
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      </div>
+      {/* Header bar — only show for named languages, not auto-detected "text" */}
+      {language !== 'text' && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '4px 8px',
+          background: 'var(--bytepilot-titlebar-bg)',
+          fontSize: '11px',
+          color: 'var(--bytepilot-fg-secondary)',
+        }}>
+          <span>{language}</span>
+          <button
+            onClick={handleCopy}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--bytepilot-fg-secondary)',
+              cursor: 'pointer',
+              fontSize: '11px',
+            }}
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      )}
       {/* Code */}
-      <SyntaxHighlighter
-        language={language}
-        style={vscDarkPlus}
-        customStyle={{
+      {language === 'text' ? (
+        <pre style={{
           margin: 0,
-          borderRadius: 0,
+          padding: '12px',
           fontSize: '12px',
           lineHeight: 1.5,
-        }}
-      >
-        {code}
-      </SyntaxHighlighter>
+          fontFamily: 'var(--bytepilot-editor-font-family, monospace)',
+          background: 'var(--bytepilot-code-bg, #1e1e1e)',
+          color: 'var(--bytepilot-fg-primary, #d4d4d4)',
+          overflowX: 'auto',
+          whiteSpace: 'pre',
+        }}>
+          {code}
+        </pre>
+      ) : (
+        <SyntaxHighlighter
+          language={language}
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            fontSize: '12px',
+            lineHeight: 1.5,
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      )}
     </div>
   );
 };

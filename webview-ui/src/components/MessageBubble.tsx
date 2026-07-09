@@ -5,51 +5,63 @@ import { CodeBlock } from './CodeBlock';
 import { ToolCallCard } from './ToolCallCard';
 import type { ChatMessage } from '../state/chat-store';
 
-/** Detect directory tree structures and wrap them in markdown code blocks. */
-function preprocessTreeBlocks(content: string): string {
-  // Step 1: Split same-line tree entries into proper lines.
-  // AI sometimes outputs entire trees without newlines, e.g.:
-  // "dir/ ├── sub/ │ └── file └── other"
-  // We insert \n before tree branch chars (├└) and vertical connectors (│)
-  // when they follow a non-tree character.
-  content = content.replace(/([^├└│\n])\s+([├└])/g, '$1\n$2');
-  content = content.replace(/([^├└│\n])\s+(│)/g, '$1\n$2');
+/** Box-drawing tree chars: ├ └ │ ─ ┬ etc. AI uses these for directory trees. */
+const TREE_CHAR_RE = /[\u2500-\u257F]/;
 
-  // Step 2: Detect lines with box-drawing chars and wrap in code fences
+/**
+ * Split same-line tree entries.
+ * AI sometimes outputs "dir/ ├── sub/ └── file" all on one line.
+ */
+function splitSameLineTreeChars(content: string): string {
+  // Only split when visible non-tree text is followed by inline space then a
+  // tree char. "+" quantifier captures the full preceding word (e.g. "dir/").
+  // Excludes tree chars, all whitespace, and newlines from the first group so
+  // structural indentation like "│   ├── file" is preserved.
+  content = content.replace(/([^├└│\s\n]+)[^\S\n]+([├└])/g, '$1\n$2');
+  content = content.replace(/([^├└│\s\n]+)[^\S\n]+(│)/g, '$1\n$2');
+  return content;
+}
+
+/**
+ * Wrap consecutive tree-character lines in a single ``` fence.
+ * This keeps the tree as one block so alignment is preserved even when
+ * the AI inserts blank lines between entries.
+ * Only detects Unicode box-drawing chars — no ASCII heuristics.
+ */
+function wrapTreeLinesInFence(content: string): string {
   const lines = content.split('\n');
   const result: string[] = [];
-  let inTree = false;
   let treeLines: string[] = [];
-  const treeChars = /[\u2500-\u257F]/;
+
+  function flush() {
+    if (treeLines.length === 0) return;
+    // Filter out lines that are ONLY tree connectors with no real content
+    // (e.g. "│ " on its own line — these are spacing artifacts, not actual entries)
+    const meaningful = treeLines.filter(l => !/^[\s│├└┬┴┼─]*$/.test(l));
+    if (meaningful.length > 0) {
+      result.push('```');
+      result.push(...treeLines);
+      result.push('```');
+    } else {
+      result.push(...treeLines);
+    }
+    treeLines = [];
+  }
 
   for (const line of lines) {
-    const isTreeLine = treeChars.test(line);
-    if (isTreeLine && !line.trim().startsWith('```')) {
-      if (!inTree) {
-        inTree = true;
-        treeLines = [];
-      }
+    if (TREE_CHAR_RE.test(line) && !line.trim().startsWith('```')) {
       treeLines.push(line);
     } else {
-      if (inTree) {
-        if (treeLines.length > 0) {
-          result.push('```');
-          result.push(...treeLines);
-          result.push('```');
-        }
-        inTree = false;
-        treeLines = [];
-      }
+      flush();
       result.push(line);
     }
   }
-  if (inTree && treeLines.length > 0) {
-    result.push('```');
-    result.push(...treeLines);
-    result.push('```');
-  }
-
+  flush();
   return result.join('\n');
+}
+
+function preprocessContent(content: string): string {
+  return wrapTreeLinesInFence(splitSameLineTreeChars(content));
 }
 
 interface MessageBubbleProps {
@@ -124,13 +136,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           }}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              children={preprocessTreeBlocks(message.content)}
+              children={preprocessContent(message.content)}
               components={{
                 code({ className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');
                   const codeStr = String(children).replace(/\n$/, '');
                   if (match) {
                     return <CodeBlock language={match[1]} code={codeStr} />;
+                  }
+                  // Multiline code without language tag — render as code block
+                  if (codeStr.includes('\n')) {
+                    return <CodeBlock language="text" code={codeStr} />;
                   }
                   return (
                     <code
@@ -139,6 +155,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                         padding: '1px 4px',
                         borderRadius: '3px',
                         fontSize: '12px',
+                        fontFamily: 'var(--bytepilot-editor-font-family, monospace)',
                       }}
                       {...props}
                     >
@@ -148,6 +165,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                 },
                 pre({ children }) {
                   return <>{children}</>;
+                },
+                // Render tree lines as monospace <pre> blocks
+                p({ children }) {
+                  const text = Array.isArray(children)
+                    ? children.map(c => (typeof c === 'string' ? c : '')).join('')
+                    : String(children ?? '');
+                  if (TREE_CHAR_RE.test(text)) {
+                    return (
+                      <pre style={{
+                        fontFamily: 'var(--bytepilot-editor-font-family, monospace)',
+                        fontSize: '12px',
+                        lineHeight: 1.5,
+                        margin: '2px 0',
+                        padding: '4px 0',
+                        whiteSpace: 'pre',
+                        overflowX: 'auto',
+                        background: 'transparent',
+                        border: 'none',
+                      }}>
+                        {children}
+                      </pre>
+                    );
+                  }
+                  return <p>{children}</p>;
                 },
                 a({ href, children }) {
                   return (

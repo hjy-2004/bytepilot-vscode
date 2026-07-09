@@ -280,3 +280,7 @@ body {
   border-top: 1px solid var(--bytepilot-border);
   margin: 8px 0;
 }
+
+.markdown-body code {
+  font-family: var(--bytepilot-editor-font-family, monospace);
+}
