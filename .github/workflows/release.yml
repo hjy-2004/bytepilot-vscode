@@ -72,5 +72,5 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: packages/tauri-app/src-tauri/target/release/bundle/${{ matrix.file }}
+          files: packages/tauri-app/src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.file }}
           generate_release_notes: true
