@@ -184,32 +184,6 @@ pub fn cmd_read_absolute_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("{}", e))
 }
 
-/// Return the system temporary directory path.
-#[tauri::command]
-pub fn cmd_get_temp_dir() -> Result<String, String> {
-    Ok(std::env::temp_dir().to_string_lossy().to_string())
-}
-
-/// Write a base64-encoded string to a file at an absolute path (no workspace check).
-/// Used for downloading update installers to temp directory.
-#[tauri::command]
-pub fn cmd_write_file_base64(path: String, content: String) -> Result<(), String> {
-    use base64::Engine;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(&content)
-        .map_err(|e| format!("base64 decode failed: {}", e))?;
-    if let Some(parent) = Path::new(&path).parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("{}", e))?;
-    }
-    std::fs::write(&path, bytes).map_err(|e| format!("{}", e))
-}
-
-/// Remove a file at an absolute path (no workspace check).
-#[tauri::command]
-pub fn cmd_remove_file_absolute(path: String) -> Result<(), String> {
-    std::fs::remove_file(&path).map_err(|e| format!("{}", e))
-}
-
 fn dirs_next() -> Option<std::path::PathBuf> {
     #[cfg(target_os = "windows")]
     {

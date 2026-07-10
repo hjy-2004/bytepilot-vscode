@@ -244,7 +244,6 @@ export const tauriAdapter:IPlatformAdapter={
       case'chat.cancel':ac?.abort();ac=null;break;
       case'chat.clear':hist=[];if(h)h({type:'chat.clear'}as ExtensionMessage);break;
       case'context.refresh':loadWS();break;
-      case'update.download':downloadAndInstallUpdate();break;
       default:if((msg as any).type==='workspace.pick')pickWS();break;
     }
   },
@@ -256,67 +255,13 @@ export const tauriAdapter:IPlatformAdapter={
 };
 
 function enqueue(){if(h)sendInit(h)}
-
-let pendingUpdate: Awaited<ReturnType<typeof check>> = null;
-let downloadingUpdate = false;
-
 async function checkForUpdate(){
   try{
-    pendingUpdate=await check();
-    if(pendingUpdate&&h){
-      h({type:'update.available',payload:{version:pendingUpdate.version,currentVersion:pendingUpdate.currentVersion,date:pendingUpdate.date,body:pendingUpdate.body,status:'available'}}as ExtensionMessage);
+    const update=await check();
+    if(update&&h){
+      h({type:'chat.error',payload:{message:`Update available: v${update.version}. Please restart to update.`,code:'UPDATE_AVAILABLE'}}as ExtensionMessage);
     }
-  }catch(e){console.error('[Adapter] checkForUpdate failed:',e)}
-}
-
-const PROXY_LIST=[
-  'https://gh-proxy.org/',
-  'https://v4.gh-proxy.org/',
-  'https://cdn.gh-proxy.org/',
-];
-
-async function downloadAndInstallUpdate(){
-  if(!pendingUpdate||!h||downloadingUpdate)return;
-  downloadingUpdate=true;
-  const version=pendingUpdate.version;
-  const filename=`BytePilot_${version}_x64_en-US.msi`;
-  const githubUrl=`https://github.com/hjy-2004/bytepilot-vscode/releases/download/v${version}/${filename}`;
-  const urls=[...PROXY_LIST.map(p=>p+githubUrl),githubUrl];
-  let lastError='';
-  try{
-    const tmpDir=(await invoke('cmd_get_temp_dir')as string).replace(/\\+$/,'');
-    const tmpFile=`${tmpDir}\\${filename}`;
-    for(const url of urls){
-      try{
-        console.log('[Adapter] Trying download:',url);
-        h({type:'update.download-progress',payload:{downloaded:0,total:null}}as ExtensionMessage);
-        // Download via Rust backend (no CORS restriction)
-        await invoke('cmd_download_file',{url,dest:tmpFile});
-        h({type:'update.download-progress',payload:{downloaded:100,total:100}}as ExtensionMessage);
-        // Schedule install via PowerShell (detached, survives app close)
-        console.log('[Adapter] Downloaded, scheduling install...');
-        // PowerShell script: wait 3s for app to close, then install & cleanup
-        const psScript=`Start-Sleep -Seconds 3; Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', '${tmpFile.replace(/'/g,"''")}', '/passive', '/norestart' -Wait; Remove-Item '${tmpFile.replace(/'/g,"''")}' -ErrorAction SilentlyContinue`;
-        await invoke('cmd_execute_command',{
-          command:`powershell -Command "Start-Process powershell -ArgumentList '-NoProfile -Command &{${psScript}}' -WindowStyle Hidden"`,
-          cwd:tmpDir,timeoutMs:5000
-        });
-        h({type:'update.done',payload:{success:true}}as ExtensionMessage);
-        // Close the app so msiexec can replace files
-        setTimeout(()=>{try{(window as any).__TAURI_INTERNALS__?.process?.exit()}catch{window.close()}},500);
-        return;
-      }catch(e:any){
-        lastError=e?.message||e?.toString?.()||'Unknown';
-        console.log('[Adapter] Mirror failed:',url,lastError);
-      }
-    }
-    throw new Error(lastError||'All mirrors failed');
-  }catch(e:any){
-    downloadingUpdate=false;
-    const msg=e?.message||e?.toString?.()||'Unknown error';
-    console.error('[Adapter] Update download/install failed:',e);
-    h({type:'update.done',payload:{success:false,error:msg}}as ExtensionMessage);
-  }
+  }catch{/* updater not available or check failed — ignore */}
 }
 function sendInit(dest:(m:ExtensionMessage)=>void){
   if(inited)return;inited=true;

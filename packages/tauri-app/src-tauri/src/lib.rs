@@ -25,9 +25,6 @@ pub fn run() {
             cmd_read_home_file,
             cmd_home_file_exists,
             cmd_read_absolute_file,
-            cmd_get_temp_dir,
-            cmd_write_file_base64,
-            cmd_remove_file_absolute,
             // Config
             cmd_get_config,
             cmd_set_config,
@@ -38,7 +35,6 @@ pub fn run() {
             cmd_secret_delete,
             // Shell
             cmd_execute_command,
-            cmd_download_file,
             // Logging
             cmd_write_log,
             cmd_get_log_path,

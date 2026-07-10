@@ -25,10 +25,6 @@ const AppDesktop: React.FC = () => {
   const config = useChatStore((s) => s.config);
   const configLoaded = useChatStore((s) => s.configLoaded);
   const contextInfo = useChatStore((s) => s.contextInfo);
-  const updateInfo = useChatStore((s) => s.updateInfo);
-  const dismissUpdate = useChatStore((s) => s.dismissUpdate);
-  const downloadingUpdate = useChatStore((s) => s.downloadingUpdate);
-  const downloadProgress = useChatStore((s) => s.downloadProgress);
   const [foundConfigs, setFoundConfigs] = useState<FoundConfig[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanDone, setScanDone] = useState(false);
@@ -100,24 +96,6 @@ const AppDesktop: React.FC = () => {
       case 'models.list':
         setFetchedModels(msg.payload.models);
         setIsFetchingModels(false);
-        break;
-      case 'update.available':
-        store.setUpdateInfo({ ...msg.payload, status: 'available' });
-        break;
-      case 'update.download-progress':
-        store.setDownloadingUpdate(true);
-        store.setDownloadProgress(msg.payload.downloaded, msg.payload.total);
-        break;
-      case 'update.done':
-        store.setDownloadingUpdate(false);
-        store.setDownloadProgress(100, 100);
-        if (msg.payload.success) {
-          const info = store.updateInfo;
-          if (info) store.setUpdateInfo({ ...info, status: 'installed' });
-        } else {
-          const info = store.updateInfo;
-          if (info) store.setUpdateInfo({ ...info, status: 'error', errorMessage: msg.payload.error });
-        }
         break;
       case 'session.list':
         setSessions(msg.payload.sessions);
@@ -265,17 +243,6 @@ const AppDesktop: React.FC = () => {
           isStreaming={isStreaming}
           contextInfo={contextInfo}
           config={config}
-          updateInfo={updateInfo}
-          onDismissUpdate={dismissUpdate}
-          downloadingUpdate={downloadingUpdate}
-          downloadProgress={downloadProgress}
-          onDownloadUpdate={() => {
-            const store = useChatStore.getState();
-            const info = store.updateInfo;
-            if (info) store.setUpdateInfo({ ...info, status: 'downloading' });
-            store.setDownloadingUpdate(true);
-            postMessage({ type: 'update.download' } as any);
-          }}
           onSend={handleSend}
           onCancel={handleCancel}
           onSetup={() => {

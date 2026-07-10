@@ -89,10 +89,6 @@ export interface FilesSearchMessage {
   payload: { query: string };
 }
 
-export interface UpdateDownloadMessage {
-  type: 'update.download';
-}
-
 export type WebViewMessage =
   | ChatSendMessage
   | ChatCancelMessage
@@ -108,7 +104,6 @@ export type WebViewMessage =
   | ConfigManualSetupMessage
   | ConfigSetKeyMessage
   | ModelsFetchMessage
-  | UpdateDownloadMessage
   | ChatRestoreMessage
   | SessionRequestMessage;
 
@@ -266,34 +261,6 @@ export interface FilesSearchResultMessage {
   payload: { files: Array<{ path: string; name: string }> };
 }
 
-export interface UpdateAvailableMessage {
-  type: 'update.available';
-  payload: {
-    version: string;
-    currentVersion: string;
-    date?: string;
-    body?: string;
-    status: 'available' | 'downloading' | 'installed' | 'error';
-    errorMessage?: string;
-  };
-}
-
-export interface UpdateDownloadProgressMessage {
-  type: 'update.download-progress';
-  payload: {
-    downloaded: number;
-    total: number | null;
-  };
-}
-
-export interface UpdateDoneMessage {
-  type: 'update.done';
-  payload: {
-    success: boolean;
-    error?: string;
-  };
-}
-
 export type ExtensionMessage =
   | ChatStartedMessage
   | ChatTokenMessage
@@ -308,7 +275,4 @@ export type ExtensionMessage =
   | ConfigFoundMessage
   | ModelsListMessage
   | ChatStateMessage
-  | SessionListMessage
-  | UpdateAvailableMessage
-  | UpdateDownloadProgressMessage
-  | UpdateDoneMessage;
+  | SessionListMessage;

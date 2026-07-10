@@ -3,7 +3,7 @@ import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ContextIndicator } from './ContextIndicator';
 import { ModelSelector } from './ModelSelector';
-import type { ChatMessage, ConfigState, UpdateInfo } from '../state/chat-store';
+import type { ChatMessage, ConfigState } from '../state/chat-store';
 
 interface SessionInfo {
   id: string;
@@ -18,11 +18,6 @@ interface ChatContainerDesktopProps {
   isStreaming: boolean;
   contextInfo: { openFiles: string[]; projectFiles: number; diagnosticsCount: number; hasRules: boolean };
   config: ConfigState | null;
-  updateInfo: UpdateInfo | null;
-  onDismissUpdate: () => void;
-  downloadingUpdate: boolean;
-  downloadProgress: number;
-  onDownloadUpdate: () => void;
   onSend: (content: string, attachments?: Array<{ name: string; content: string; type: 'image'; mimeType: string }>) => void;
   onCancel: () => void;
   onSetup: () => void;
@@ -48,11 +43,6 @@ export const ChatContainerDesktop: React.FC<ChatContainerDesktopProps> = ({
   isStreaming,
   contextInfo,
   config,
-  updateInfo,
-  onDismissUpdate,
-  downloadingUpdate,
-  downloadProgress,
-  onDownloadUpdate,
   onSend,
   onCancel,
   onSetup,
@@ -155,101 +145,6 @@ export const ChatContainerDesktop: React.FC<ChatContainerDesktopProps> = ({
             />
           </div>
         </div>
-
-        {/* Update available banner */}
-        {updateInfo && (() => {
-          const status = updateInfo.status;
-          const isInstalled = status === 'installed';
-          const isError = status === 'error';
-          const isDownloading = status === 'downloading' || downloadingUpdate;
-          const bg = isInstalled ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
-            : isError ? 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)'
-            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-          return (
-          <div style={{
-            background: bg,
-            color: '#fff',
-            padding: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            fontSize: '13px',
-            flexShrink: 0,
-            flexWrap: 'wrap',
-          }}>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              {isInstalled ? (
-                <>&#10003; Update <strong>v{updateInfo.version}</strong> installed. <strong>Please restart</strong> to apply.</>
-              ) : isError ? (
-                <>&#10007; Update failed{updateInfo.errorMessage ? `: ${updateInfo.errorMessage}` : ''}.</>
-              ) : (
-                <>&#128640; Update available: <strong>v{updateInfo.version}</strong>
-                {updateInfo.currentVersion && <> (current: v{updateInfo.currentVersion})</>}
-                .</>
-              )}
-            </span>
-            <span style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-              {isDownloading ? (
-                <>
-                  <div style={{
-                    width: '120px',
-                    height: '6px',
-                    background: 'rgba(255,255,255,0.3)',
-                    borderRadius: '3px',
-                    overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      width: downloadProgress >= 0 ? `${downloadProgress}%` : '30%',
-                      height: '100%',
-                      background: '#fff',
-                      borderRadius: '3px',
-                      transition: 'width 0.3s',
-                      ...(downloadProgress < 0 ? {
-                        animation: 'bytepilot-progress-indeterminate 1.5s ease-in-out infinite',
-                        width: '40%',
-                      } : {}),
-                    }} />
-                  </div>
-                  <span style={{ fontSize: '12px', minWidth: '36px' }}>{downloadProgress >= 0 ? `${downloadProgress}%` : '...'}</span>
-                  <style>{`@keyframes bytepilot-progress-indeterminate{0%{margin-left:-40%}100%{margin-left:100%}}`}</style>
-                </>
-              ) : !isInstalled && !isError ? (
-                <button
-                  onClick={onDownloadUpdate}
-                  style={{
-                    background: 'rgba(255,255,255,0.25)',
-                    border: '1px solid rgba(255,255,255,0.4)',
-                    color: '#fff',
-                    padding: '4px 14px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}
-                >
-                  Download &amp; Install
-                </button>
-              ) : null}
-              <button
-                onClick={onDismissUpdate}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'rgba(255,255,255,0.7)',
-                  padding: '2px 6px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  lineHeight: 1,
-                }}
-                title="Dismiss"
-              >
-                &times;
-              </button>
-            </span>
-          </div>
-        )})()}
 
         {/* Conversation or Welcome */}
         {hasContent ? (
