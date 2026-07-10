@@ -284,46 +284,33 @@ async function downloadAndInstallUpdate(){
   const urls=[...PROXY_LIST.map(p=>p+githubUrl),githubUrl];
   let lastError='';
   try{
+    const tmpDir=await invoke('cmd_get_temp_dir')as string;
+    const tmpFile=`${tmpDir}\\${filename}`;
     for(const url of urls){
       try{
         console.log('[Adapter] Trying download:',url);
-        const resp=await fetch(url,{signal:AbortSignal.timeout(300000)});
-        if(!resp.ok){lastError=`HTTP ${resp.status}`;continue}
-        const total=Number(resp.headers.get('content-length')||'0');
-        const reader=resp.body!.getReader();
-        const chunks:Uint8Array[]=[];
-        let downloaded=0;
-        h({type:'update.download-progress',payload:{downloaded:0,total:total||null}}as ExtensionMessage);
-        while(true){
-          const{value,done}=await reader.read();
-          if(done)break;
-          chunks.push(value);
-          downloaded+=value.length;
-          h({type:'update.download-progress',payload:{downloaded,total:total||null}}as ExtensionMessage);
-        }
-        // Combine chunks
-        const buf=new Uint8Array(downloaded);
-        let pos=0;
-        for(const c of chunks){buf.set(c,pos);pos+=c.length}
-        // Save to temp and install
-        const tmpDir=await invoke('cmd_get_temp_dir')as string;
-        const tmpFile=`${tmpDir}\\${filename}`;
-        // Convert to base64 in chunks to avoid stack overflow on large files
-        const CHUNK=0x8000;let b64='';
-        for(let i=0;i<buf.length;i+=CHUNK){b64+=btoa(String.fromCharCode(...buf.subarray(i,i+CHUNK)))}
-        await invoke('cmd_write_file_base64',{path:tmpFile,content:b64});
-        h({type:'update.download-progress',payload:{downloaded:total||downloaded,total:total||downloaded}}as ExtensionMessage);
-        // Install silently
-        await invoke('cmd_execute_command',{command:`msiexec /i "${tmpFile}" /passive /norestart`,cwd:tmpDir,timeoutMs:120000});
-        // Clean up temp file (best-effort)
-        try{await invoke('cmd_remove_file_absolute',{path:tmpFile})}catch{}
-        await new Promise(r=>setTimeout(r,1500));
+        h({type:'update.download-progress',payload:{downloaded:0,total:null}}as ExtensionMessage);
+        // Download via Rust backend (no CORS restriction)
+        await invoke('cmd_download_file',{url,dest:tmpFile});
+        h({type:'update.download-progress',payload:{downloaded:100,total:100}}as ExtensionMessage);
+        // Write a batch script that installs after app closes
+        console.log('[Adapter] Downloaded, scheduling install...');
+        const batFile=`${tmpDir}\\bytepilot_update.bat`;
+        const bat=`@echo off\r\ntimeout /t 2 /nobreak > nul\r\nmsiexec /i "${tmpFile}" /passive /norestart\r\ndel /q "${tmpFile}"\r\ndel /q "${batFile}"\r\n`;
+        // Write batch via base64
+        const CHUNK=0x8000;
+        const enc=new TextEncoder().encode(bat);
+        let b64='';
+        for(let i=0;i<enc.length;i+=CHUNK){b64+=btoa(String.fromCharCode(...enc.subarray(i,i+CHUNK)))}
+        await invoke('cmd_write_file_base64',{path:batFile,content:b64});
+        // Launch detached via start "" so app can close immediately
+        await invoke('cmd_execute_command',{command:`start "" /min "${batFile}"`,cwd:tmpDir,timeoutMs:5000});
         h({type:'update.done',payload:{success:true}}as ExtensionMessage);
-        pendingUpdate=null;
-        downloadingUpdate=false;
+        // Close the app so msiexec can replace files
+        setTimeout(()=>{try{(window as any).__TAURI_INTERNALS__?.process?.exit()}catch{window.close()}},500);
         return;
       }catch(e:any){
-        lastError=e?.message||'Unknown';
+        lastError=e?.message||e?.toString?.()||'Unknown';
         console.log('[Adapter] Mirror failed:',url,lastError);
       }
     }

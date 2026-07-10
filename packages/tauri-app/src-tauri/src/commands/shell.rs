@@ -127,6 +127,28 @@ pub fn cmd_execute_command(
     }
 }
 
+/// Download a file from a URL to a local path using reqwest (no CORS restrictions).
+/// Returns the file size in bytes on success.
+#[tauri::command]
+pub async fn cmd_download_file(url: String, dest: String) -> Result<u64, String> {
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("Download request failed: {}", e))?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Download read failed: {}", e))?;
+    let size = bytes.len() as u64;
+    if let Some(parent) = std::path::Path::new(&dest).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("{}", e))?;
+    }
+    std::fs::write(&dest, bytes).map_err(|e| format!("{}", e))?;
+    Ok(size)
+}
+
 /// Kill a process by its PID. Cross-platform: uses taskkill on Windows, SIGKILL on Unix.
 fn kill_by_pid(pid: Option<u32>) {
     let Some(pid) = pid else { return };

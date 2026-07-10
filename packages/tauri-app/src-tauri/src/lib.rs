@@ -38,6 +38,7 @@ pub fn run() {
             cmd_secret_delete,
             // Shell
             cmd_execute_command,
+            cmd_download_file,
             // Logging
             cmd_write_log,
             cmd_get_log_path,
