@@ -284,7 +284,7 @@ async function downloadAndInstallUpdate(){
   const urls=[...PROXY_LIST.map(p=>p+githubUrl),githubUrl];
   let lastError='';
   try{
-    const tmpDir=await invoke('cmd_get_temp_dir')as string;
+    const tmpDir=(await invoke('cmd_get_temp_dir')as string).replace(/\\+$/,'');
     const tmpFile=`${tmpDir}\\${filename}`;
     for(const url of urls){
       try{
