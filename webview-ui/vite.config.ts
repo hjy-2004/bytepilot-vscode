@@ -13,7 +13,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      external: ['@tauri-apps/api', '@tauri-apps/api/core', '@tauri-apps/api/event'],
+      // @tauri-apps/api must NOT be external — usePlatform.ts statically
+      // imports tauri-adapter.ts which pulls in @tauri-apps/plugin-updater
+      // → @tauri-apps/api/core. Externalizing breaks both VS Code and desktop.
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',

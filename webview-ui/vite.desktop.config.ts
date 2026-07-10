@@ -24,7 +24,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.desktop.html'),
-      external: ['@tauri-apps/api', '@tauri-apps/api/core', '@tauri-apps/api/event'],
+      // @tauri-apps/api must NOT be external — it is statically imported
+      // via tauri-adapter → @tauri-apps/plugin-updater → @tauri-apps/api/core.
+      // Externalizing it leaves bare module specifiers that browsers can't resolve.
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',

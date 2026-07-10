@@ -32,3 +32,5 @@ webview-ui/dist/
 .bytepilot/
 **/.bytepilot/
 BYTEPILOT.local.md
+tauri-signing.key
+tauri-signing.key.pub

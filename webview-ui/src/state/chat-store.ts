@@ -41,6 +41,15 @@ export interface PermissionRequest {
   diff?: UnifiedDiff;
 }
 
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  date?: string;
+  body?: string;
+  status: 'available' | 'downloading' | 'installed' | 'error';
+  errorMessage?: string;
+}
+
 interface ChatStore {
   messages: ChatMessage[];
   streamingText: string;
@@ -54,6 +63,7 @@ interface ChatStore {
     diagnosticsCount: number;
     hasRules: boolean;
   };
+  updateInfo: UpdateInfo | null;
 
   addUserMessage: (content: string) => void;
   appendStreamChunk: (text: string) => void;
@@ -68,6 +78,12 @@ interface ChatStore {
   setPermissionRequest: (request: PermissionRequest | null) => void;
   updateContext: (info: { openFiles: string[]; projectFiles: number; diagnosticsCount: number; hasRules?: boolean }) => void;
   addErrorMessage: (content: string) => void;
+  downloadingUpdate: boolean;
+  downloadProgress: number;
+  setUpdateInfo: (info: UpdateInfo | null) => void;
+  dismissUpdate: () => void;
+  setDownloadingUpdate: (downloading: boolean) => void;
+  setDownloadProgress: (downloaded: number, total: number | null) => void;
   restoreMessages: (msgs: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number; toolCalls?: ToolCallEntry[] }>) => void;
   // Input history
   inputHistory: string[];
@@ -87,6 +103,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   configLoaded: false,
   permissionRequest: null,
   contextInfo: { openFiles: [], projectFiles: 0, diagnosticsCount: 0, hasRules: false },
+  updateInfo: null,
+  downloadingUpdate: false,
+  downloadProgress: 0,
   inputHistory: [],
 
   addUserMessage: (content: string) => {
@@ -189,6 +208,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       timestamp: Date.now(),
     };
     set((s) => ({ messages: [...s.messages, msg], isStreaming: false }));
+  },
+
+  setUpdateInfo: (info) => set({ updateInfo: info }),
+
+  dismissUpdate: () => set({ updateInfo: null, downloadingUpdate: false, downloadProgress: 0 }),
+
+  setDownloadingUpdate: (downloading) => set((s) => ({
+    downloadingUpdate: downloading,
+    downloadProgress: 0,
+    updateInfo: s.updateInfo ? { ...s.updateInfo, status: downloading ? ('downloading' as const) : s.updateInfo.status } : null,
+  })),
+
+  setDownloadProgress: (downloaded, total) => {
+    // When total is known, calculate real percentage; otherwise use -1 for indeterminate
+    const pct = total && total > 0 ? Math.min(99, Math.round((downloaded / total) * 100)) : -1;
+    set({ downloadProgress: pct });
   },
 
   restoreMessages: (msgs) => {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/static/tauri-v2-conf-schema.json",
   "productName": "BytePilot",
-  "version": "0.7.5",
+  "version": "0.7.1",
   "identifier": "com.bytepilot.app",
   "build": {
     "frontendDist": "../../../webview-ui/dist-desktop",
@@ -18,7 +18,8 @@
         "minWidth": 400,
         "minHeight": 300,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "devtools": true
       }
     ],
     "security": {
@@ -39,9 +40,9 @@
     },
     "updater": {
       "endpoints": [
-        "https://github.com/hjy-2004/bytepilot-vscode/releases/latest/download/latest.json"
+        "https://raw.githubusercontent.com/hjy-2004/bytepilot-vscode/master/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwNkQyQjMyRTJDRjEyM0YKUldRL0VzL2lNaXR0c0o2Qk5QbkoxQ0k4ai92dDlZNXVWMnFZcVlBRUJ0UmpRK21OT2o4TGY4Ry8K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZERDgwNURCREY5QjkzQTMKUldTams1dmYyd1hZL2Zzc0xaQzVjM0Q3bGU1am05NjNzUTYvY2Z6ajFqbXVoVHVsVHNBZ3JRajIK",
       "windows": {
         "installMode": "passive"
       }

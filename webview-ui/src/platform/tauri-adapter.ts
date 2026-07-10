@@ -244,6 +244,7 @@ export const tauriAdapter:IPlatformAdapter={
       case'chat.cancel':ac?.abort();ac=null;break;
       case'chat.clear':hist=[];if(h)h({type:'chat.clear'}as ExtensionMessage);break;
       case'context.refresh':loadWS();break;
+      case'update.download':downloadAndInstallUpdate();break;
       default:if((msg as any).type==='workspace.pick')pickWS();break;
     }
   },
@@ -255,13 +256,55 @@ export const tauriAdapter:IPlatformAdapter={
 };
 
 function enqueue(){if(h)sendInit(h)}
+
+let pendingUpdate: Awaited<ReturnType<typeof check>> = null;
+let downloadingUpdate = false;
+
 async function checkForUpdate(){
   try{
-    const update=await check();
-    if(update&&h){
-      h({type:'chat.error',payload:{message:`Update available: v${update.version}. Please restart to update.`,code:'UPDATE_AVAILABLE'}}as ExtensionMessage);
+    pendingUpdate=await check();
+    if(pendingUpdate&&h){
+      h({type:'update.available',payload:{version:pendingUpdate.version,currentVersion:pendingUpdate.currentVersion,date:pendingUpdate.date,body:pendingUpdate.body,status:'available'}}as ExtensionMessage);
     }
-  }catch{/* updater not available or check failed — ignore */}
+  }catch(e){console.error('[Adapter] checkForUpdate failed:',e)}
+}
+
+async function downloadAndInstallUpdate(){
+  if(!pendingUpdate||!h||downloadingUpdate)return;
+  downloadingUpdate=true;
+  let totalSize:number|null=null;
+  let cumulative=0;
+  try{
+    h({type:'update.download-progress',payload:{downloaded:0,total:null}}as ExtensionMessage);
+    await pendingUpdate.downloadAndInstall((event)=>{
+      switch(event.event){
+        case'Started':
+          totalSize=event.data?.contentLength??null;
+          // Send initial progress with total (or null for indeterminate)
+          h!({type:'update.download-progress',payload:{downloaded:0,total:totalSize}}as ExtensionMessage);
+          break;
+        case'Progress':
+          // chunkLength is per-chunk, not cumulative — track ourselves
+          cumulative+=event.data?.chunkLength??0;
+          h!({type:'update.download-progress',payload:{downloaded:cumulative,total:totalSize}}as ExtensionMessage);
+          break;
+        case'Finished':
+          // Send 100% so the bar fills before the banner goes away
+          h!({type:'update.download-progress',payload:{downloaded:totalSize??cumulative,total:totalSize??cumulative}}as ExtensionMessage);
+          break;
+      }
+    });
+    // Brief delay so user sees completion before banner hides
+    await new Promise(r=>setTimeout(r,1500));
+    h({type:'update.done',payload:{success:true}}as ExtensionMessage);
+    pendingUpdate=null;
+    downloadingUpdate=false;
+  }catch(e:any){
+    downloadingUpdate=false;
+    const msg=e?.message||e?.toString?.()||'Unknown error';
+    console.error('[Adapter] Update download/install failed:',e);
+    h({type:'update.done',payload:{success:false,error:msg}}as ExtensionMessage);
+  }
 }
 function sendInit(dest:(m:ExtensionMessage)=>void){
   if(inited)return;inited=true;

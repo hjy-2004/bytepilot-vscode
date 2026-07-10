@@ -91,6 +91,24 @@ const App: React.FC = () => {
           setActiveSessionId((prev) => prev || msg.payload.sessions[0].id);
         }
         break;
+      case 'update.available':
+        store.setUpdateInfo({ ...msg.payload, status: 'available' });
+        break;
+      case 'update.download-progress':
+        store.setDownloadingUpdate(true);
+        store.setDownloadProgress(msg.payload.downloaded, msg.payload.total);
+        break;
+      case 'update.done':
+        store.setDownloadingUpdate(false);
+        store.setDownloadProgress(100, 100);
+        if (msg.payload.success) {
+          const info = store.updateInfo;
+          if (info) store.setUpdateInfo({ ...info, status: 'installed' });
+        } else {
+          const info = store.updateInfo;
+          if (info) store.setUpdateInfo({ ...info, status: 'error', errorMessage: msg.payload.error });
+        }
+        break;
     }
   }, []);
 
