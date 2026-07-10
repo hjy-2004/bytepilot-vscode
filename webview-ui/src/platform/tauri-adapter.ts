@@ -293,18 +293,14 @@ async function downloadAndInstallUpdate(){
         // Download via Rust backend (no CORS restriction)
         await invoke('cmd_download_file',{url,dest:tmpFile});
         h({type:'update.download-progress',payload:{downloaded:100,total:100}}as ExtensionMessage);
-        // Write a batch script that installs after app closes
+        // Schedule install via PowerShell (detached, survives app close)
         console.log('[Adapter] Downloaded, scheduling install...');
-        const batFile=`${tmpDir}\\bytepilot_update.bat`;
-        const bat=`@echo off\r\ntimeout /t 2 /nobreak > nul\r\nmsiexec /i "${tmpFile}" /passive /norestart\r\ndel /q "${tmpFile}"\r\ndel /q "${batFile}"\r\n`;
-        // Write batch via base64
-        const CHUNK=0x8000;
-        const enc=new TextEncoder().encode(bat);
-        let b64='';
-        for(let i=0;i<enc.length;i+=CHUNK){b64+=btoa(String.fromCharCode(...enc.subarray(i,i+CHUNK)))}
-        await invoke('cmd_write_file_base64',{path:batFile,content:b64});
-        // Launch detached via start "" so app can close immediately
-        await invoke('cmd_execute_command',{command:`start "" /min "${batFile}"`,cwd:tmpDir,timeoutMs:5000});
+        // PowerShell script: wait 3s for app to close, then install & cleanup
+        const psScript=`Start-Sleep -Seconds 3; Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', '${tmpFile.replace(/'/g,"''")}', '/passive', '/norestart' -Wait; Remove-Item '${tmpFile.replace(/'/g,"''")}' -ErrorAction SilentlyContinue`;
+        await invoke('cmd_execute_command',{
+          command:`powershell -Command "Start-Process powershell -ArgumentList '-NoProfile -Command &{${psScript}}' -WindowStyle Hidden"`,
+          cwd:tmpDir,timeoutMs:5000
+        });
         h({type:'update.done',payload:{success:true}}as ExtensionMessage);
         // Close the app so msiexec can replace files
         setTimeout(()=>{try{(window as any).__TAURI_INTERNALS__?.process?.exit()}catch{window.close()}},500);
