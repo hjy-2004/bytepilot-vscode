@@ -269,36 +269,65 @@ async function checkForUpdate(){
   }catch(e){console.error('[Adapter] checkForUpdate failed:',e)}
 }
 
+const PROXY_LIST=[
+  'https://gh-proxy.org/',
+  'https://v4.gh-proxy.org/',
+  'https://cdn.gh-proxy.org/',
+];
+
 async function downloadAndInstallUpdate(){
   if(!pendingUpdate||!h||downloadingUpdate)return;
   downloadingUpdate=true;
-  let totalSize:number|null=null;
-  let cumulative=0;
+  const version=pendingUpdate.version;
+  const filename=`BytePilot_${version}_x64_en-US.msi`;
+  const githubUrl=`https://github.com/hjy-2004/bytepilot-vscode/releases/download/v${version}/${filename}`;
+  const urls=[...PROXY_LIST.map(p=>p+githubUrl),githubUrl];
+  let lastError='';
   try{
-    h({type:'update.download-progress',payload:{downloaded:0,total:null}}as ExtensionMessage);
-    await pendingUpdate.downloadAndInstall((event)=>{
-      switch(event.event){
-        case'Started':
-          totalSize=event.data?.contentLength??null;
-          // Send initial progress with total (or null for indeterminate)
-          h!({type:'update.download-progress',payload:{downloaded:0,total:totalSize}}as ExtensionMessage);
-          break;
-        case'Progress':
-          // chunkLength is per-chunk, not cumulative — track ourselves
-          cumulative+=event.data?.chunkLength??0;
-          h!({type:'update.download-progress',payload:{downloaded:cumulative,total:totalSize}}as ExtensionMessage);
-          break;
-        case'Finished':
-          // Send 100% so the bar fills before the banner goes away
-          h!({type:'update.download-progress',payload:{downloaded:totalSize??cumulative,total:totalSize??cumulative}}as ExtensionMessage);
-          break;
+    for(const url of urls){
+      try{
+        console.log('[Adapter] Trying download:',url);
+        const resp=await fetch(url,{signal:AbortSignal.timeout(300000)});
+        if(!resp.ok){lastError=`HTTP ${resp.status}`;continue}
+        const total=Number(resp.headers.get('content-length')||'0');
+        const reader=resp.body!.getReader();
+        const chunks:Uint8Array[]=[];
+        let downloaded=0;
+        h({type:'update.download-progress',payload:{downloaded:0,total:total||null}}as ExtensionMessage);
+        while(true){
+          const{value,done}=await reader.read();
+          if(done)break;
+          chunks.push(value);
+          downloaded+=value.length;
+          h({type:'update.download-progress',payload:{downloaded,total:total||null}}as ExtensionMessage);
+        }
+        // Combine chunks
+        const buf=new Uint8Array(downloaded);
+        let pos=0;
+        for(const c of chunks){buf.set(c,pos);pos+=c.length}
+        // Save to temp and install
+        const tmpDir=await invoke('cmd_get_temp_dir')as string;
+        const tmpFile=`${tmpDir}\\${filename}`;
+        // Convert to base64 in chunks to avoid stack overflow on large files
+        const CHUNK=0x8000;let b64='';
+        for(let i=0;i<buf.length;i+=CHUNK){b64+=btoa(String.fromCharCode(...buf.subarray(i,i+CHUNK)))}
+        await invoke('cmd_write_file_base64',{path:tmpFile,content:b64});
+        h({type:'update.download-progress',payload:{downloaded:total||downloaded,total:total||downloaded}}as ExtensionMessage);
+        // Install silently
+        await invoke('cmd_execute_command',{command:`msiexec /i "${tmpFile}" /passive /norestart`,cwd:tmpDir,timeoutMs:120000});
+        // Clean up temp file (best-effort)
+        try{await invoke('cmd_remove_file_absolute',{path:tmpFile})}catch{}
+        await new Promise(r=>setTimeout(r,1500));
+        h({type:'update.done',payload:{success:true}}as ExtensionMessage);
+        pendingUpdate=null;
+        downloadingUpdate=false;
+        return;
+      }catch(e:any){
+        lastError=e?.message||'Unknown';
+        console.log('[Adapter] Mirror failed:',url,lastError);
       }
-    });
-    // Brief delay so user sees completion before banner hides
-    await new Promise(r=>setTimeout(r,1500));
-    h({type:'update.done',payload:{success:true}}as ExtensionMessage);
-    pendingUpdate=null;
-    downloadingUpdate=false;
+    }
+    throw new Error(lastError||'All mirrors failed');
   }catch(e:any){
     downloadingUpdate=false;
     const msg=e?.message||e?.toString?.()||'Unknown error';
