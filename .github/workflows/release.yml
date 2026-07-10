@@ -102,8 +102,7 @@ jobs:
       - name: List downloaded files
         run: find ./updater-bundles -type f
 
-      - name: Generate latest.json and commit assets
-        id: manifest
+      - name: Generate latest.json
         run: |
           set -e
           TAG="${GITHUB_REF#refs/tags/}"
@@ -119,44 +118,30 @@ jobs:
               echo ""
             fi
           }
-          find_and_copy_asset() {
+          find_url() {
             local pattern="$1"
             local file=$(find ./updater-bundles -name "${pattern}" -not -name "*.sig" | head -1)
             if [ -n "$file" ]; then
               local filename=$(basename "$file")
-              cp "$file" "releases/${filename}"
-              echo "${filename}"
+              # Use ghproxy.net to proxy GitHub release assets (accessible in China)
+              echo "https://ghproxy.net/https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${filename}"
             else
               echo ""
             fi
           }
-          jsdelivr_url() {
-            local filename="$1"
-            if [ -n "$filename" ]; then
-              echo "https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@master/releases/${filename}"
-            else
-              echo ""
-            fi
-          }
-
-          mkdir -p releases
 
           DARWIN_SIG=$(find_sig "*.dmg.sig")
-          DARWIN_FILE=$(find_and_copy_asset "*.dmg")
-          DARWIN_URL=$(jsdelivr_url "$DARWIN_FILE")
+          DARWIN_URL=$(find_url "*.dmg")
 
           WINDOWS_SIG=$(find_sig "*.msi.sig")
-          WINDOWS_FILE=$(find_and_copy_asset "*.msi")
-          WINDOWS_URL=$(jsdelivr_url "$WINDOWS_FILE")
+          WINDOWS_URL=$(find_url "*.msi")
 
           LINUX_SIG=$(find_sig "*.AppImage.sig")
-          LINUX_FILE=$(find_and_copy_asset "*.AppImage")
-          LINUX_URL=$(jsdelivr_url "$LINUX_FILE")
+          LINUX_URL=$(find_url "*.AppImage")
 
-          if [ -z "$LINUX_FILE" ]; then
+          if [ -z "$LINUX_URL" ]; then
             LINUX_SIG=$(find_sig "*.deb.sig")
-            LINUX_FILE=$(find_and_copy_asset "*.deb")
-            LINUX_URL=$(jsdelivr_url "$LINUX_FILE")
+            LINUX_URL=$(find_url "*.deb")
           fi
 
           jq -n \
@@ -182,14 +167,16 @@ jobs:
 
           echo "Generated latest.json:"
           cat latest.json
-          echo ""
-          echo "Release assets:"
-          ls -la releases/
 
-      - name: Commit and push release assets to repo
+      - name: Commit latest.json to repo (served via jsDelivr CDN)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add latest.json releases/
-          git commit -m "release: update latest.json and assets for ${GITHUB_REF#refs/tags/}" || echo "No changes to commit"
+          git add latest.json
+          git commit -m "release: update latest.json for ${TAG}" || echo "No changes"
           git push
+
+      - name: Upload latest.json to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: latest.json
