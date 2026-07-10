@@ -67,7 +67,7 @@ pub fn cmd_execute_command(
         ("sh", "-c")
     };
 
-    let mut child = Command::new(shell)
+    let child = Command::new(shell)
         .arg(flag)
         .arg(&command)
         .current_dir(&cwd)
@@ -91,7 +91,7 @@ pub fn cmd_execute_command(
     std::thread::spawn(move || {
         // Take ownership of the child from the mutex, then release the lock
         let owned_child = child_for_thread.lock().unwrap().take();
-        if let Some(mut c) = owned_child {
+        if let Some(c) = owned_child {
             let result = c.wait_with_output();
             let _ = tx.send(result);
         }
