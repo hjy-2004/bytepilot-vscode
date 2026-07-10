@@ -40,7 +40,7 @@
     },
     "updater": {
       "endpoints": [
-        "https://raw.githubusercontent.com/hjy-2004/bytepilot-vscode/master/latest.json"
+        "https://cdn.jsdelivr.net/gh/hjy-2004/bytepilot-vscode@master/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZERDgwNURCREY5QjkzQTMKUldTams1dmYyd1hZL2Zzc0xaQzVjM0Q3bGU1am05NjNzUTYvY2Z6ajFqbXVoVHVsVHNBZ3JRajIK",
       "windows": {
