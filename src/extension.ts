@@ -17,7 +17,7 @@ import { generateText } from 'ai';
 import { InlineCompletionProvider } from './completion/inline-provider';
 import { CompletionEngine } from './ai/completion-engine';
 import { loadSessionMessages, createSession, listSessions } from './chat/history';
-import { interactiveImport, scanKnownLocations, importCachedConfig } from './config/importer';
+import { interactiveImport, importCachedConfig } from './config/importer';
 import type { WebViewMessage } from './types/ipc';
 import { VSCodeConfigStore } from './platform/vscode-config';
 import { VSCodeFileSystem } from './platform/vscode-filesystem';
@@ -637,7 +637,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   resolveWebviewView(
-    webviewView: vscode.WebviewView,
+    _webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {

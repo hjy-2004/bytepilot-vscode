@@ -1,7 +1,6 @@
 import type { LanguageModelV1 } from 'ai';
 import type { IConfigStore } from '@bytepilot/core';
 import { logInfo } from '../utils/logger';
-import { detectApiFormat } from '../config/provider-presets';
 
 /**
  * Completion engine supporting multiple providers for code completions.
@@ -34,8 +33,6 @@ export class CompletionEngine {
     const url = (baseURL || '').toLowerCase();
     const isDeepSeek = url.includes('deepseek.com') || provider === 'deepseek';
     const isOllama = provider === 'ollama';
-    const apiFormat = detectApiFormat(provider, baseURL);
-
     // Native FIM: DeepSeek and Ollama have dedicated FIM endpoints
     if (isOllama) {
       return this.generateOllamaFIM(modelId, prefix, suffix, temperature, maxTokens, apiKey, baseURL, abortSignal);

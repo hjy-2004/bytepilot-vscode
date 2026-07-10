@@ -193,7 +193,7 @@ export class MessageRouter implements vscode.Disposable {
 
       case 'chat.cancel': {
         this.chatEngine?.cancel();
-        for (const [id, { resolve }] of this.pendingApprovalResolver) {
+        for (const [, { resolve }] of this.pendingApprovalResolver) {
           resolve(false);
         }
         this.pendingApprovalResolver.clear();

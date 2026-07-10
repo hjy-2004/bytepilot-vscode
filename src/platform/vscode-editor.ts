@@ -20,8 +20,8 @@ export class VSCodeEditorHost implements IEditorHost {
       hideFromUser: true,
     });
     return new Promise<CommandResult>((resolve) => {
-      let stdout = '';
-      let stderr = '';
+      const stdout = '';
+      const stderr = '';
       let killed = false;
       const timeout = setTimeout(() => { killed = true; terminal.dispose(); }, timeoutMs);
       // Note: VS Code terminals don't give us stdout/stderr directly.
